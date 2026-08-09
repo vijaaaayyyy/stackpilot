@@ -21,14 +21,14 @@ export const metadata: Metadata = {
       'Explore technology categories — from frontend and backend to AI, payments, and video APIs.',
     siteName: siteConfig.openGraph.siteName,
     locale: siteConfig.openGraph.locale,
-    images: [{ url: absoluteUrl('/og.svg'), width: 1200, height: 630, alt: siteConfig.name }],
+    images: [{ url: absoluteUrl('/og.png'), width: 1200, height: 630, alt: siteConfig.name }],
   },
   twitter: {
     card: 'summary_large_image',
     title: 'Browse Categories',
     description:
       'Explore technology categories — from frontend and backend to AI, payments, and video APIs.',
-    images: [absoluteUrl('/og.svg')],
+    images: [absoluteUrl('/og.png')],
   },
 };
 

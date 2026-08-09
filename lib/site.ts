@@ -19,7 +19,7 @@ export type SiteConfig = {
 export const siteConfig: SiteConfig = {
   name: 'Stack2Set',
   shortName: 'Stack2Set',
-  version: '4.4.3',
+  version: '4.4.4',
   url: (process.env.NEXT_PUBLIC_SITE_URL ?? 'https://www.stack2set.me').replace(/\/+$/, ''),
   title: 'Stack2Set — Discover every technology to build your next BIG THING!',
   description:

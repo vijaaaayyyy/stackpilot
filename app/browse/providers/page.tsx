@@ -21,14 +21,14 @@ export const metadata: Metadata = {
       'Browse and compare providers from the Stack2Set database. Filter by category, pricing, and more.',
     siteName: siteConfig.openGraph.siteName,
     locale: siteConfig.openGraph.locale,
-    images: [{ url: absoluteUrl('/og.svg'), width: 1200, height: 630, alt: siteConfig.name }],
+    images: [{ url: absoluteUrl('/og.png'), width: 1200, height: 630, alt: siteConfig.name }],
   },
   twitter: {
     card: 'summary_large_image',
     title: 'Browse Providers',
     description:
       'Browse and compare providers from the Stack2Set database. Filter by category, pricing, and more.',
-    images: [absoluteUrl('/og.svg')],
+    images: [absoluteUrl('/og.png')],
   },
 };
 

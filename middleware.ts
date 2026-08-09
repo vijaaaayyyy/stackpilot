@@ -12,6 +12,6 @@ export const config = {
     '/signup',
     '/forgot-password',
     '/auth/:path*',
-    '/((?!_next/static|_next/image|favicon.ico|icon.svg|manifest.webmanifest|og.svg|robots.txt|sitemap.xml).*)',
+    '/((?!_next/static|_next/image|favicon.ico|icon.svg|manifest.webmanifest|og.svg|og.png|robots.txt|sitemap.xml).*)',
   ],
 };

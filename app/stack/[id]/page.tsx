@@ -46,14 +46,14 @@ export async function generateMetadata({
       siteName: siteConfig.openGraph.siteName,
       title: `${share.name} — ${siteConfig.name}`,
       description,
-      images: [{ url: '/og.svg', width: 1200, height: 630, alt: share.name }],
+      images: [{ url: '/og.png', width: 1200, height: 630, alt: share.name }],
     },
     twitter: {
       card: 'summary_large_image',
       title: `${share.name} — ${siteConfig.name}`,
       description,
       creator: siteConfig.twitterHandle,
-      images: ['/og.svg'],
+      images: ['/og.png'],
     },
   };
 }

@@ -4,6 +4,7 @@ import { Check, Sparkles, Rocket, Building2 } from 'lucide-react';
 import { Navbar } from '@/components/landing/navbar';
 import { Footer } from '@/components/landing/footer';
 import { CTA } from '@/components/landing/cta';
+import { PricingFreeTip } from '@/components/landing/pricing-free-tip';
 import { cn } from '@/lib/utils';
 
 export const metadata: Metadata = {
@@ -67,6 +68,7 @@ export default function PricingPage() {
   return (
     <main className="relative min-h-screen overflow-x-hidden">
       <Navbar />
+      <PricingFreeTip />
       <div className="relative overflow-hidden px-4 pb-24 pt-32 sm:px-6 sm:pt-36">
         <div className="pointer-events-none absolute left-1/2 top-0 -z-10 h-[400px] w-[700px] -translate-x-1/2 rounded-full bg-teal-500/10 blur-[120px]" />
 
@@ -79,6 +81,24 @@ export default function PricingPage() {
             Stack2Set is free for everyone today. Simple plans for developers, startups, and teams.
           </p>
         </header>
+
+        <div className="mx-auto mt-10 flex max-w-5xl flex-col items-center justify-between gap-4 rounded-2xl border border-teal-500/30 bg-teal-500/[0.08] px-6 py-4 sm:flex-row">
+          <div className="flex items-center gap-3 text-center sm:text-left">
+            <span className="hidden h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-teal-500/15 sm:flex">
+              <Sparkles className="h-4 w-4 text-teal-400" />
+            </span>
+            <p className="text-sm text-muted-foreground">
+              Stack2Set is <span className="font-semibold text-teal-300">100% free</span> right
+              now — use it while it&apos;s free!
+            </p>
+          </div>
+          <Link
+            href="/"
+            className="inline-flex h-10 shrink-0 items-center justify-center rounded-xl bg-teal-500 px-5 text-sm font-medium text-white shadow-lg shadow-teal-500/20 transition-all hover:bg-teal-600"
+          >
+            Start building for free
+          </Link>
+        </div>
 
         <div className="mx-auto mt-16 grid max-w-5xl gap-6 lg:grid-cols-3">
           {plans.map((plan) => (

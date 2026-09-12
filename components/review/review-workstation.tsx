@@ -208,9 +208,12 @@ export function ReviewWorkstation({
         flashFor('SLOW MOTION');
       }
 
-      if (autoRef.current && next >= IMPACT_T) {
-        progressRef.current = IMPACT_T;
-        setProgress(IMPACT_T);
+      /* LBW runs through to the stumps so the ball connects and the wicket
+         breaks; other types freeze on the contact frame. */
+      const freezeAt = isLbw ? 1 : IMPACT_T;
+      if (autoRef.current && next >= freezeAt) {
+        progressRef.current = freezeAt;
+        setProgress(freezeAt);
         setPlaying(false);
         setOverlays(true);
         setZoom(isCaught ? 2.3 : 2);

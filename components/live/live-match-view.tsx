@@ -4,6 +4,7 @@ import { useCallback, useEffect, useId, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { AnimatePresence, motion, useReducedMotion } from 'framer-motion';
 import {
+  Camera,
   Check,
   ChevronLeft,
   ChevronRight,
@@ -17,6 +18,7 @@ import {
   Send,
   ShieldAlert,
   ShieldCheck,
+  Upload,
   Video,
   X,
 } from 'lucide-react';
@@ -490,6 +492,12 @@ export function LiveMatchView({
   const [camErr, setCamErr] = useState<string | null>(null);
   const [camSeconds, setCamSeconds] = useState(0);
   const [camStream, setCamStream] = useState<MediaStream | null>(null);
+  const [camSaving, setCamSaving] = useState(false);
+  const [camUpload, setCamUpload] = useState<{
+    status: 'done' | 'error';
+    ball?: string;
+    message: string;
+  } | null>(null);
   const camRecorderRef = useRef<ClipRecorder | null>(null);
   const camPreviewRef = useRef<HTMLVideoElement | null>(null);
 
@@ -581,22 +589,48 @@ export function LiveMatchView({
     setReviewOpen(true);
   };
 
-  /* Cut the last ~12s of the phone's rolling capture (the final delivery),
-     upload it, then open the review on that clip. */
-  const goReview = async (type: string) => {
-    const camNow = camRecorderRef.current;
-    if (camNow?.recording) {
-      try {
-        const blob = await camNow.stop(true, 12);
-        if (blob) {
-          await uploadClip(blob, delivery.over, { durationMs: Math.round(camNow.seconds * 1000) });
-        }
-      } catch {
-        /* review still opens without a clip */
+  /* Cut the last ~15s of the phone's rolling capture (the final delivery) and
+     upload it as ball <delivery.over>. Returns the ball id, or null on failure. */
+  const captureLastDelivery = useCallback(
+    async (keepSeconds = 15): Promise<string | null> => {
+      const camNow = camRecorderRef.current;
+      if (!camNow?.recording) {
+        setCamUpload({ status: 'error', message: 'No recording in progress — press Record before the ball.' });
+        return null;
       }
-      setCamOn(false);
-      setCamStream(null);
-      setCamSeconds(0);
+      setCamSaving(true);
+      try {
+        const blob = await camNow.stop(true, keepSeconds);
+        if (!blob) throw new Error('Nothing was captured');
+        const { ok } = await uploadClip(blob, delivery.over, {
+          durationMs: Math.round(camNow.seconds * 1000),
+        });
+        setCamUpload({
+          status: 'done',
+          ball: delivery.over,
+          message: ok ? 'Uploaded to the drs-clips bucket.' : 'Saved on this device — no storage bucket yet.',
+        });
+        setCamOn(false);
+        setCamStream(null);
+        setCamSeconds(0);
+        return delivery.over;
+      } catch (error) {
+        setCamUpload({
+          status: 'error',
+          message: error instanceof Error ? error.message : 'Upload failed',
+        });
+        return null;
+      } finally {
+        setCamSaving(false);
+      }
+    },
+    [delivery.over],
+  );
+
+  const goReview = async (type: string) => {
+    /* Best-effort: cut + upload the last delivery before opening the review */
+    if (camRecorderRef.current?.recording) {
+      await captureLastDelivery(15);
     }
     setReviewOpen(false);
     router.push(
@@ -680,7 +714,7 @@ export function LiveMatchView({
                   camOn ? 'animate-pulse bg-rose-500' : 'bg-white/35',
                 )}
               />
-              {camOn ? `REC ${Math.round(camSeconds)}s` : camErr ? 'CAM ERR' : 'UMPIRE CAM'}
+              {camSaving ? 'SAVING…' : camOn ? `REC ${Math.round(camSeconds)}s` : camErr ? 'CAM ERR' : 'UMPIRE CAM'}
             </button>
             {slow && (
               <StatusPill tone="teal">Slow-Mo ×0.22</StatusPill>
@@ -691,22 +725,7 @@ export function LiveMatchView({
           </div>
         </div>
 
-        {/* Phone camera at the umpire end — live feed overlay */}
-        {camOn && camStream && (
-          <div className="pointer-events-none absolute bottom-3 right-3 z-10 w-44 overflow-hidden rounded-lg border border-white/20 bg-black shadow-xl shadow-black/50">
-            <video
-              ref={camPreviewRef}
-              autoPlay
-              muted
-              playsInline
-              className="aspect-video h-full w-full object-cover"
-            />
-            <span className="absolute left-1.5 top-1.5 flex items-center gap-1 rounded bg-black/70 px-1.5 py-0.5 font-mono text-[9px] font-semibold uppercase tracking-widest text-rose-300">
-              <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-rose-500" />
-              Umpire cam
-            </span>
-          </div>
-        )}
+        {/* Live preview now lives in the Umpire Camera sidebar panel */}
 
         <div className="relative px-2 pb-2 sm:px-4">
           <style>{`
@@ -1121,6 +1140,123 @@ export function LiveMatchView({
         <p className="border-t border-foreground/5 px-5 py-3 text-center text-xs text-muted-foreground">
           {delivery.description}
         </p>
+      </div>
+
+      {/* Umpire camera — live recording + last-ball upload */}
+      <div className="flex flex-col overflow-hidden rounded-2xl border border-foreground/10 bg-[#0b0b14]/90 shadow-xl shadow-black/30">
+        <div className="flex items-center justify-between px-5 py-4">
+          <div className="flex items-center gap-2.5">
+            <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-rose-500/10 ring-1 ring-rose-500/25">
+              <Video className="h-4 w-4 text-rose-300" />
+            </span>
+            <div>
+              <h3 className="text-sm font-semibold tracking-tight text-foreground">Umpire Camera</h3>
+              <p className="text-[10px] uppercase tracking-widest text-muted-foreground">Live recording · last ball</p>
+            </div>
+          </div>
+          {camOn && (
+            <span className="flex items-center gap-1.5 rounded-full bg-rose-500/10 px-2.5 py-1 font-mono text-[10px] font-semibold uppercase tracking-widest text-rose-300 ring-1 ring-rose-500/30">
+              <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-rose-500" />
+              {Math.round(camSeconds)}s
+            </span>
+          )}
+        </div>
+
+        <div className="px-5 pb-4">
+          <div className="relative aspect-video w-full overflow-hidden rounded-xl border border-foreground/10 bg-black">
+            {camOn && camStream ? (
+              <video ref={camPreviewRef} autoPlay muted playsInline className="h-full w-full object-cover" />
+            ) : (
+              <div className="flex h-full flex-col items-center justify-center gap-2 text-center">
+                <Camera className="h-6 w-6 text-muted-foreground/50" />
+                <p className="px-8 text-[11px] leading-relaxed text-muted-foreground">
+                  Point your phone at the umpire end with a clear view of the pitch, then press Record.
+                </p>
+              </div>
+            )}
+            {camOn && camStream && (
+              <span className="absolute left-2 top-2 flex items-center gap-1 rounded bg-black/70 px-2 py-0.5 font-mono text-[9px] font-semibold uppercase tracking-widest text-rose-300">
+                <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-rose-500" />
+                Umpire cam
+              </span>
+            )}
+          </div>
+
+          <div className="mt-3 flex flex-wrap items-center gap-2">
+            <button
+              type="button"
+              onClick={toggleCam}
+              disabled={camSaving || Boolean(camErr)}
+              className={cn(
+                'inline-flex h-9 flex-1 items-center justify-center gap-2 rounded-lg text-xs font-semibold transition-colors disabled:opacity-40',
+                camOn
+                  ? 'bg-rose-500/15 text-rose-300 ring-1 ring-rose-500/40 hover:bg-rose-500/25'
+                  : 'bg-teal-500/10 text-teal-300 ring-1 ring-teal-400/30 hover:bg-teal-500/20',
+              )}
+            >
+              {camOn ? (
+                <>
+                  <span className="h-2 w-2 rounded-sm bg-rose-400" /> STOP
+                </>
+              ) : (
+                <>
+                  <Camera className="h-3.5 w-3.5" /> RECORD
+                </>
+              )}
+            </button>
+            <button
+              type="button"
+              onClick={() => captureLastDelivery(15)}
+              disabled={camSaving || !camOn}
+              className="inline-flex h-9 flex-1 items-center justify-center gap-2 rounded-lg border border-foreground/10 px-3 text-xs font-medium text-foreground/80 transition-colors hover:border-rose-500/30 hover:text-rose-300 disabled:opacity-40"
+              title="Cut the last 15 seconds of the rolling capture and save this delivery"
+            >
+              {camSaving ? (
+                <Loader2 className="h-3.5 w-3.5 animate-spin" />
+              ) : (
+                <Upload className="h-3.5 w-3.5" />
+              )}
+              {camSaving ? 'UPLOADING…' : 'UPLOAD LAST BALL'}
+            </button>
+          </div>
+
+          <p className="mt-3 text-[11px] leading-relaxed text-muted-foreground">
+            {camOn ? (
+              <>
+                Rolling capture is on —{' '}
+                <span className="text-rose-300">review or upload cuts the last 15 seconds</span> of the delivery.
+              </>
+            ) : (
+              <>Start recording before the ball is bowled so the last delivery can be cut and uploaded.</>
+            )}
+          </p>
+
+          {camErr && !camOn && <p className="mt-2 text-[11px] text-rose-300">{camErr}</p>}
+
+          {camUpload && (
+            <div
+              className={cn(
+                'mt-2 flex items-center gap-2 rounded-lg border px-3 py-2 text-xs',
+                camUpload.status === 'done'
+                  ? 'border-emerald-500/30 bg-emerald-500/[0.05] text-emerald-300'
+                  : 'border-rose-500/30 bg-rose-500/[0.05] text-rose-300',
+              )}
+            >
+              {camUpload.status === 'done' ? (
+                <Check className="h-3.5 w-3.5 shrink-0" />
+              ) : (
+                <X className="h-3.5 w-3.5 shrink-0" />
+              )}
+              {camUpload.status === 'done' ? (
+                <>
+                  Ball {camUpload.ball} clip — {camUpload.message}
+                </>
+              ) : (
+                <>{camUpload.message}</>
+              )}
+            </div>
+          )}
+        </div>
       </div>
 
       {/* Ball by ball panel */}

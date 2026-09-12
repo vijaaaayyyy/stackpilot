@@ -42,7 +42,7 @@ export function AuthEmailForm({
     (fallback: string) => {
       const { path, hasPending } = getPostAuthTarget(fallback);
       if (hasPending) clearPendingQuery();
-      router.replace(path);
+      router.replace(`/auth/success?next=${encodeURIComponent(path)}`);
       router.refresh();
     },
     [router],

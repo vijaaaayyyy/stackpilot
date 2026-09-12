@@ -22,7 +22,9 @@ export async function GET(request: NextRequest) {
     const { error } = await supabase.auth.exchangeCodeForSession(code);
     if (!error) {
       const destination = safePath(request.cookies.get(AUTH_NEXT_COOKIE)?.value) ?? safePath(next) ?? '/dashboard';
-      const response = NextResponse.redirect(`${origin}${destination}`);
+      const response = NextResponse.redirect(
+        `${origin}/auth/success?next=${encodeURIComponent(destination)}`,
+      );
       response.cookies.delete(AUTH_NEXT_COOKIE);
       return response;
     }

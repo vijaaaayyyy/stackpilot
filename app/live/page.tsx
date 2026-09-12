@@ -1,16 +1,12 @@
 import type { Metadata } from 'next';
-import { LiveMatchView } from '@/components/live/live-match-view';
+import { ReviewConsole } from '@/components/live/review-console';
 import { TurfShell, TurfPageHeader } from '@/components/turf/turf-shell';
-import type { Decision, Review, ReviewStatus, ReviewTypeId } from '@/lib/drs/types';
 
 export const metadata: Metadata = {
   title: 'Live Match',
-  description: 'Follow the live match, ball by ball, and request Turf DRS reviews.',
+  description: 'Rolling camera review console — record each delivery and send it to the Turf DRS review player.',
   alternates: { canonical: '/live' },
 };
-
-const DECISIONS = new Set(['OUT', 'NOT OUT', 'INCONCLUSIVE']);
-const STATUSES = new Set(['UPHELD', 'OVERTURNED', 'INCONCLUSIVE']);
 
 export default async function LiveMatchPage({
   searchParams,
@@ -23,22 +19,6 @@ export default async function LiveMatchPage({
   const tournament = params.tournament?.trim() || 'Hyderabad Turf League';
   const matchLabel = `${title} · ${tournament}`;
 
-  const initialReview: Review | null =
-    params.review && DECISIONS.has(params.review)
-      ? {
-          id: `live-${Date.now()}`,
-          matchId: params.match ?? 'demo-live',
-          matchLabel,
-          ballId: params.ball ?? '16.4',
-          type: (params.type as ReviewTypeId) ?? 'lbw',
-          onField: 'NOT OUT',
-          decision: params.review as Decision,
-          status: (params.status as ReviewStatus) ?? 'INCONCLUSIVE',
-          reason: '',
-          createdAt: Date.now(),
-        }
-      : null;
-
   return (
     <TurfShell>
       <TurfPageHeader
@@ -47,18 +27,18 @@ export default async function LiveMatchPage({
         highlight="LIVE"
         description={
           demo
-            ? 'Interactive demo running — watch the delivery, request the review, and decide it in the workstation.'
-            : 'Strikers 142/5 in 16.4 overs · Chasing 143 · 48 needed off 21 balls.'
+            ? 'Rolling-buffer review console — record the delivery, then send it to the review player.'
+            : 'Review console — record each delivery at the umpire end and route it to Turf DRS.'
         }
       />
 
       <div className="pointer-events-none absolute left-1/2 top-0 -z-10 h-[400px] w-[700px] -translate-x-1/2 rounded-full bg-rose-500/10 blur-[120px]" />
 
-      <LiveMatchView
+      <ReviewConsole
         demo={demo}
         matchId={params.match ?? 'demo-live'}
         matchLabel={matchLabel}
-        initialReview={initialReview}
+        justReviewedBall={params.ball ?? null}
       />
     </TurfShell>
   );

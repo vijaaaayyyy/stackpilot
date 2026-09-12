@@ -7,6 +7,7 @@ import { Features } from '@/components/landing/features';
 import { Audience } from '@/components/landing/audience';
 import { FaqSection } from '@/components/landing/faq-section';
 import { DocsSection } from '@/components/landing/docs-section';
+import { LastReview } from '@/components/landing/last-review';
 import { CTA } from '@/components/landing/cta';
 import { Footer } from '@/components/landing/footer';
 import { ScrollLightField, LightReveal, SectionGlow } from '@/components/cinematic/scroll-lighting';
@@ -74,6 +75,7 @@ export default function Home() {
       </div>
       <Navbar />
       <Hero />
+      <LastReview />
       <LightReveal className="relative">
         <SectionGlow glow="purple" />
         <HowItWorks />

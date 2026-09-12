@@ -1,457 +1,133 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
-import {
-  BookOpen,
-  ChevronRight,
-  DollarSign,
-  ExternalLink,
-  Github,
-  Layers,
-  ShieldCheck,
-  Sparkles,
-  Star,
-  Tag,
-} from 'lucide-react';
-import { providerService } from '@/lib/services/provider-service';
-import type { ProviderWithRelations } from '@/lib/db/schema';
-import { isProviderFree, providerCostLabel } from '@/lib/stacks/health';
-import { categoryIcon } from '@/lib/browse/category-icons';
-import { WorkspaceShell } from '@/components/workspace/workspace-shell';
-import { compareBadge, badgeIcon } from '@/lib/stacks/badge';
-import { FavoriteButton } from '@/components/browse/favorite-button';
+import { Check, MapPin, PlayCircle, Videotape } from 'lucide-react';
+import { DRS_VENUES, getAllVenues, getVenueBySlug } from '@/lib/drs/browse';
 import { siteConfig, absoluteUrl } from '@/lib/site';
-import { breadcrumbSchema, serializeJsonLd } from '@/lib/jsonld';
 
-export const runtime = 'nodejs';
-export const dynamic = 'force-dynamic';
+interface Props {
+  params: { slug: string };
+}
 
-export async function generateMetadata({
-  params,
-}: {
-  params: Promise<{ slug: string }>;
-}): Promise<Metadata> {
-  const { slug } = await params;
-  const provider = await providerService.getProviderBySlug(slug);
-  if (!provider) return { title: 'Provider not found' };
-  const category = provider.categoryId
-    ? await providerService.getCategoryBySlug(provider.categoryId)
-    : null;
-  const canonical = `/browse/providers/${provider.slug}`;
-  const title = `${provider.name} — ${category?.name ?? 'Technology'} Provider`;
-  const description = provider.shortDescription;
+export function generateStaticParams() {
+  return getAllVenues().map((venue) => ({ slug: venue.slug }));
+}
 
+export function generateMetadata({ params }: Props): Metadata {
+  const venue = getVenueBySlug(params.slug);
+  if (!venue) return {};
+  const canonical = `/browse/providers/${venue.slug}`;
   return {
-    title,
-    description,
+    title: venue.name,
+    description: venue.summary,
     alternates: { canonical },
-    robots: {
-      index: true,
-      follow: true,
-    },
     openGraph: {
       type: 'website',
       url: absoluteUrl(canonical),
-      title,
-      description,
+      title: venue.name,
+      description: venue.summary,
       siteName: siteConfig.openGraph.siteName,
       locale: siteConfig.openGraph.locale,
       images: [{ url: absoluteUrl('/og.png'), width: 1200, height: 630, alt: siteConfig.name }],
     },
-    twitter: {
-      card: 'summary_large_image',
-      title,
-      description,
-      images: [absoluteUrl('/og.png')],
-    },
   };
 }
 
-function StatCell({ label, value }: { label: string; value?: number }) {
-  if (typeof value !== 'number') {
-    return (
-      <div className="rounded-xl border border-foreground/5 bg-foreground/[0.02] p-3">
-        <p className="text-[11px] text-muted-foreground">{label}</p>
-        <p className="mt-0.5 text-sm font-medium text-muted-foreground/50">—</p>
-      </div>
-    );
-  }
-  return (
-    <div className="rounded-xl border border-foreground/5 bg-foreground/[0.02] p-3">
-      <p className="text-[11px] text-muted-foreground">{label}</p>
-      <div className="mt-1.5 flex items-center gap-2">
-        <div className="h-1.5 w-full overflow-hidden rounded-full bg-foreground/10">
-          <div
-            className="h-full rounded-full bg-teal-500"
-            style={{ width: `${(value / 5) * 100}%` }}
-          />
-        </div>
-        <span className="shrink-0 text-xs font-medium tabular-nums text-foreground">
-          {value}/5
-        </span>
-      </div>
-    </div>
-  );
-}
+export default function VenuePage({ params }: Props) {
+  const venue = getVenueBySlug(params.slug);
+  if (!venue) notFound();
 
-function CriterionGrid({
-  title,
-  icon,
-  values,
-  emptyText,
-}: {
-  title: string;
-  icon: React.ReactNode;
-  values: string[];
-  emptyText?: string;
-}) {
-  const safeValues = values ?? [];
-  if (safeValues.length === 0 && !emptyText) return null;
-  return (
-    <div className="rounded-2xl glass p-5">
-      <p className="flex items-center gap-1.5 text-sm font-medium text-foreground">
-        {icon}
-        {title}
-      </p>
-      <div className="mt-3 flex flex-wrap gap-1.5">
-        {safeValues.length === 0 ? (
-          <span className="text-xs text-muted-foreground/50">{emptyText ?? '—'}</span>
-        ) : (
-          safeValues.map((value) => (
-            <span
-              key={value}
-              className="rounded-md border border-foreground/5 bg-foreground/[0.03] px-2 py-1 text-[11px] text-muted-foreground"
-            >
-              {value}
-            </span>
-          ))
-        )}
-      </div>
-    </div>
-  );
-}
-
-function FactsGrid({ provider }: { provider: ProviderWithRelations }) {
-  const rating = provider.stack2SetRating ?? provider.communityRating;
-  return (
-    <div className="grid grid-cols-2 gap-3">
-      <div className="rounded-xl border border-foreground/5 bg-foreground/[0.02] p-3">
-        <p className="text-[11px] text-muted-foreground">Pricing model</p>
-        <p className="mt-0.5 text-sm font-medium capitalize text-foreground">
-          {provider.pricingModel?.replace('-', ' ')}
-        </p>
-      </div>
-      <div className="rounded-xl border border-foreground/5 bg-foreground/[0.02] p-3">
-        <p className="text-[11px] text-muted-foreground">Free tier</p>
-        <p className="mt-0.5 text-sm font-medium text-foreground">{provider.freeTier ? 'Yes' : 'No'}</p>
-      </div>
-      <div className="rounded-xl border border-foreground/5 bg-foreground/[0.02] p-3">
-        <p className="text-[11px] text-muted-foreground">Open source</p>
-        <p className="mt-0.5 text-sm font-medium text-foreground">{provider.openSource ? 'Yes' : 'No'}</p>
-      </div>
-      <div className="rounded-xl border border-foreground/5 bg-foreground/[0.02] p-3">
-        <p className="text-[11px] text-muted-foreground">Popularity</p>
-        <p className="mt-0.5 text-sm font-medium text-foreground">{provider.popularityScore ?? 0}/100</p>
-      </div>
-      {typeof rating === 'number' && (
-        <div className="rounded-xl border border-foreground/5 bg-foreground/[0.02] p-3">
-          <p className="text-[11px] text-muted-foreground">Stack2Set rating</p>
-          <p className="mt-0.5 flex items-center gap-1 text-sm font-medium text-amber-300">
-            <Star className="h-3.5 w-3.5 fill-current" /> {rating.toFixed(1)}
-          </p>
-        </div>
-      )}
-      <div className="rounded-xl border border-foreground/5 bg-foreground/[0.02] p-3">
-        <p className="text-[11px] text-muted-foreground">Est. monthly cost</p>
-        <p className="mt-0.5 text-sm font-medium text-foreground">{providerCostLabel(provider)}</p>
-      </div>
-      {provider.enterprisePricing && (
-        <div className="col-span-2 rounded-xl border border-foreground/5 bg-foreground/[0.02] p-3">
-          <p className="text-[11px] text-muted-foreground">Enterprise pricing</p>
-          <p className="mt-0.5 text-sm font-medium text-foreground">{provider.enterprisePricing}</p>
-        </div>
-      )}
-    </div>
-  );
-}
-
-export default async function ProviderDetailPage({
-  params,
-}: {
-  params: Promise<{ slug: string }>;
-}) {
-  const { slug } = await params;
-  const provider = await providerService.getProviderBySlug(slug);
-  if (!provider) notFound();
-
-  const categoryId = provider.categoryId;
-  const [category, alternatives, categoryProviders] = await Promise.all([
-    categoryId ? providerService.getCategoryBySlug(categoryId) : Promise.resolve(null),
-    providerService.getAlternatives(slug),
-    categoryId ? providerService.getProvidersByCategory(categoryId) : Promise.resolve([]),
-  ]);
-
-  const Icon = categoryIcon(category?.icon);
-  const group = categoryProviders.length > 1 ? categoryProviders : [provider];
-  const badge = compareBadge(provider, group);
-  const BadgeIcon = badge ? badgeIcon(badge) : null;
-  const sourceIsFallback = provider.aiSuggested;
-  const breadcrumbItems = [
-    { name: 'Home', url: '/' },
-    { name: 'Browse Categories', url: '/browse/categories' },
+  const stats = [
+    { label: 'Type', value: venue.type },
+    { label: 'City', value: venue.city },
+    { label: 'Strips', value: String(venue.strips) },
+    { label: 'Surface', value: venue.surface },
   ];
-  if (category) breadcrumbItems.push({ name: category.name, url: `/browse/categories/${category.slug}` });
-  breadcrumbItems.push({ name: provider.name, url: `/browse/providers/${provider.slug}` });
 
   return (
-    <WorkspaceShell>
-      <script
-        type="application/ld+json"
-        dangerouslySetInnerHTML={{ __html: serializeJsonLd(breadcrumbSchema(breadcrumbItems)) }}
-      />
-      <div className="space-y-6">
-        <nav
-          aria-label="Breadcrumb"
-          className="flex flex-wrap items-center gap-1.5 text-xs text-muted-foreground"
-        >
-          <Link href="/" className="transition-colors hover:text-foreground">
-            Home
-          </Link>
-          <ChevronRight className="h-3 w-3" />
-          <Link href="/browse/categories" className="transition-colors hover:text-foreground">
-            Browse Categories
-          </Link>
-          {category && (
-            <>
-              <ChevronRight className="h-3 w-3" />
-              <Link
-                href={`/browse/categories/${category.slug}`}
-                className="transition-colors hover:text-foreground"
-              >
-                {category.name}
-              </Link>
-            </>
-          )}
-          <ChevronRight className="h-3 w-3" />
-          <span className="font-medium text-foreground">{provider.name}</span>
-        </nav>
+    <div className="mx-auto max-w-3xl space-y-6 px-4 py-10">
+      <Link
+        href="/browse/providers"
+        className="text-xs text-muted-foreground transition-colors hover:text-foreground"
+      >
+        ← Back to venues
+      </Link>
 
-        <div className="rounded-2xl glass p-6">
-          <div className="flex flex-col gap-4 sm:flex-row sm:items-start">
-            <div className="flex h-16 w-16 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br from-teal-500/20 to-cyan-500/20 ring-1 ring-foreground/10">
-              <span className="text-xl font-semibold text-teal-300">{provider.name.charAt(0)}</span>
-            </div>
-            <div className="min-w-0 flex-1">
-              <div className="flex flex-wrap items-center gap-2">
-                <h1 className="text-2xl font-semibold tracking-tight text-foreground">
-                  {provider.name}
-                </h1>
-                {badge && BadgeIcon && (
-                  <span className="inline-flex items-center gap-1 rounded-md bg-amber-500/10 px-2 py-1 text-[10px] font-medium text-amber-300">
-                    <BadgeIcon className="h-3 w-3" /> {badge}
-                  </span>
-                )}
-                {sourceIsFallback && (
-                  <span className="inline-flex items-center gap-1 rounded-md bg-fuchsia-500/10 px-2 py-1 text-[10px] font-medium text-fuchsia-300">
-                    <Sparkles className="h-3 w-3" /> AI suggested
-                  </span>
-                )}
-              </div>
-              <p className="mt-1 flex items-center gap-1.5 text-sm text-muted-foreground">
-                <Icon className="h-3.5 w-3.5" />
-                {category ? (
-                  <Link
-                    href={`/browse/categories/${category.slug}`}
-                    className="transition-colors hover:text-teal-300"
-                  >
-                    {category.name}
-                  </Link>
-                ) : (
-                  'Provider'
-                )}
-              </p>
-              <p className="mt-3 max-w-2xl text-sm leading-relaxed text-muted-foreground">
-                {provider.longDescription || provider.shortDescription}
-              </p>
-
-              <div className="mt-4 flex flex-wrap gap-2">
-                <FavoriteButton slug={slug} categoryId={provider.categoryId} showLabel />
-                {provider.officialWebsite && (
-                  <a
-                    href={provider.officialWebsite}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="inline-flex items-center gap-1.5 rounded-lg bg-teal-500 px-3 py-2 text-xs font-medium text-white transition-opacity hover:opacity-90"
-                  >
-                    <ExternalLink className="h-3.5 w-3.5" /> Website
-                  </a>
-                )}
-                {provider.documentation && (
-                  <a
-                    href={provider.documentation}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="inline-flex items-center gap-1.5 rounded-lg border border-foreground/5 px-3 py-2 text-xs text-muted-foreground transition-all hover:border-teal-500/25 hover:text-foreground"
-                  >
-                    <BookOpen className="h-3.5 w-3.5" /> Documentation
-                  </a>
-                )}
-                {provider.github && (
-                  <a
-                    href={provider.github}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="inline-flex items-center gap-1.5 rounded-lg border border-foreground/5 px-3 py-2 text-xs text-muted-foreground transition-all hover:border-teal-500/25 hover:text-foreground"
-                  >
-                    <Github className="h-3.5 w-3.5" /> GitHub
-                  </a>
-                )}
-              </div>
-            </div>
+      <div className="rounded-2xl glass p-6">
+        <div className="flex items-center gap-4">
+          <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-teal-500/20 to-cyan-500/20 ring-1 ring-teal-500/20">
+            <MapPin className="h-7 w-7 text-teal-300" />
           </div>
-        </div>
-
-        {provider.aiSummary && (
-          <div className="rounded-2xl border border-teal-500/20 bg-teal-500/[0.06] p-5">
-            <p className="flex items-center gap-1.5 text-xs font-medium text-teal-300">
-              <Sparkles className="h-3.5 w-3.5" /> AI summary
+          <div>
+            <h1 className="text-2xl font-semibold tracking-tight text-foreground">{venue.name}</h1>
+            <p className="mt-1 flex items-center gap-1.5 text-xs text-white/45">
+              <MapPin className="h-3.5 w-3.5" />
+              {venue.city} · {venue.type}
             </p>
-            <p className="mt-2 text-sm leading-relaxed text-muted-foreground">{provider.aiSummary}</p>
           </div>
-        )}
-
-        <div>
-          <h2 className="mb-3 flex items-center gap-2 text-sm font-medium text-foreground">
-            <DollarSign className="h-4 w-4 text-teal-400" /> Pricing &amp; rating
-          </h2>
-          <FactsGrid provider={provider} />
         </div>
+        <p className="mt-4 text-sm leading-relaxed text-muted-foreground">{venue.summary}</p>
 
-        <div>
-          <h2 className="mb-3 text-sm font-medium text-foreground">Performance</h2>
-          <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-            <StatCell label="Learning curve" value={provider.learningCurve} />
-            <StatCell label="Speed" value={provider.speed} />
-            <StatCell label="Scalability" value={provider.scalability} />
-            <StatCell label="Reliability" value={provider.reliability} />
-          </div>
-          {provider.security && (
-            <p className="mt-3 flex items-center gap-1.5 text-xs text-emerald-300">
-              <ShieldCheck className="h-3.5 w-3.5" /> Security review passed
-            </p>
-          )}
-        </div>
-
-        <div className="grid gap-4 md:grid-cols-2">
-          <CriterionGrid
-            title="Features"
-            icon={<Sparkles className="h-3.5 w-3.5 text-teal-400" />}
-            values={provider.features ?? []}
-            emptyText="Features coming soon"
-          />
-          <CriterionGrid
-            title="Integrations"
-            icon={<Layers className="h-3.5 w-3.5 text-teal-400" />}
-            values={provider.integrations ?? []}
-          />
-          <CriterionGrid
-            title="APIs"
-            icon={<BookOpen className="h-3.5 w-3.5 text-teal-400" />}
-            values={provider.apis ?? []}
-          />
-          <CriterionGrid
-            title="SDKs"
-            icon={<Layers className="h-3.5 w-3.5 text-teal-400" />}
-            values={provider.sdks ?? []}
-          />
-          <CriterionGrid
-            title="AI features"
-            icon={<Sparkles className="h-3.5 w-3.5 text-teal-400" />}
-            values={provider.aiFeatures ?? []}
-          />
-          <CriterionGrid
-            title="Languages"
-            icon={<Layers className="h-3.5 w-3.5 text-teal-400" />}
-            values={provider.languages ?? []}
-          />
-          {provider.compatibility && Object.keys(provider.compatibility).length > 0 && (
-            <CriterionGrid
-              title="Compatibility"
-              icon={<Layers className="h-3.5 w-3.5 text-teal-400" />}
-              values={Object.entries(provider.compatibility)
-                .filter(([, value]) => value)
-                .map(([key]) => key)}
-            />
-          )}
-          {provider.compliance && provider.compliance.length > 0 && (
-            <CriterionGrid
-              title="Compliance"
-              icon={<ShieldCheck className="h-3.5 w-3.5 text-teal-400" />}
-              values={provider.compliance}
-            />
-          )}
-          <CriterionGrid
-            title="Tags"
-            icon={<Tag className="h-3.5 w-3.5 text-teal-400" />}
-            values={provider.tags ?? []}
-            emptyText="Tags coming soon"
-          />
-        </div>
-
-        <div className="grid gap-4 md:grid-cols-3">
-          <CriterionGrid
-            title="Pros"
-            icon={<Star className="h-3.5 w-3.5 text-emerald-400" />}
-            values={provider.pros ?? []}
-          />
-          <CriterionGrid
-            title="Cons"
-            icon={<Star className="h-3.5 w-3.5 text-rose-400" />}
-            values={provider.cons ?? []}
-          />
-          <CriterionGrid
-            title="Best use cases"
-            icon={<Sparkles className="h-3.5 w-3.5 text-amber-400" />}
-            values={provider.bestUseCases ?? []}
-          />
-        </div>
-
-        {alternatives.length > 0 && (
-          <div className="rounded-2xl glass p-5">
-            <h2 className="mb-3 text-sm font-medium text-foreground">Alternatives</h2>
-            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-              {alternatives.map((alt) => (
-                <Link
-                  key={alt.slug}
-                  href={`/browse/providers/${alt.slug}`}
-                  className="group rounded-xl border border-foreground/5 bg-foreground/[0.02] p-4 transition-colors hover:border-teal-500/25"
-                >
-                  <div className="flex items-center gap-2.5">
-                    <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-gradient-to-br from-teal-500/20 to-cyan-500/20 ring-1 ring-foreground/10">
-                      <span className="text-xs font-semibold text-teal-300">{alt.name.charAt(0)}</span>
-                    </div>
-                    <div className="min-w-0">
-                      <p className="truncate text-sm font-medium text-foreground group-hover:text-teal-300">
-                        {alt.name}
-                      </p>
-                      <p className="flex items-center gap-1 text-[11px] text-muted-foreground">
-                        <Star className="h-2.5 w-2.5 text-amber-300" />
-                        {alt.popularityScore}/100 popularity
-                      </p>
-                    </div>
-                  </div>
-                </Link>
-              ))}
+        <div className="mt-5 grid grid-cols-2 gap-2 sm:grid-cols-4">
+          {stats.map((stat) => (
+            <div key={stat.label} className="rounded-lg border border-foreground/5 bg-foreground/[0.02] px-3 py-2">
+              <dt className="text-[10px] font-mono uppercase tracking-widest text-white/35">
+                {stat.label}
+              </dt>
+              <dd className="mt-0.5 text-sm text-foreground">{stat.value}</dd>
             </div>
-          </div>
-        )}
-
-        {provider.source === 'seed' && provider.lastSyncedAt && (
-          <p className="text-center text-[11px] text-muted-foreground/60">
-            Data last synced {provider.lastSyncedAt}. Runs update automatically.
-          </p>
-        )}
+          ))}
+        </div>
       </div>
-    </WorkspaceShell>
+
+      <section className="rounded-2xl glass p-6">
+        <h2 className="flex items-center gap-2 text-sm font-semibold text-foreground">
+          <Videotape className="h-4 w-4 text-teal-300" />
+          Camera rig
+        </h2>
+        <p className="mt-3 text-sm leading-relaxed text-muted-foreground">{venue.rig}.</p>
+      </section>
+
+      <section className="rounded-2xl glass p-6">
+        <h2 className="text-sm font-semibold text-foreground">What&apos;s here</h2>
+        <ul className="mt-4 space-y-3">
+          {venue.highlights.map((highlight) => (
+            <li key={highlight} className="flex items-start gap-3 text-sm text-muted-foreground">
+              <Check className="mt-0.5 h-4 w-4 shrink-0 text-teal-300" />
+              {highlight}
+            </li>
+          ))}
+        </ul>
+        {venue.features.length > 0 && (
+          <div className="mt-4 flex flex-wrap gap-1.5">
+            {venue.features.map((feature) => (
+              <span
+                key={feature}
+                className="rounded-full border border-foreground/5 bg-foreground/[0.03] px-2.5 py-1 text-[11px] text-muted-foreground"
+              >
+                {feature}
+              </span>
+            ))}
+          </div>
+        )}
+      </section>
+
+      <div className="flex flex-col gap-3 sm:flex-row">
+        <Link
+          href="/cameras"
+          className="flex flex-1 items-center justify-center gap-2 rounded-xl border border-teal-500/25 bg-teal-500/10 px-4 py-3 text-sm font-medium text-teal-200 transition-colors hover:bg-teal-500/20"
+        >
+          <Videotape className="h-4 w-4" />
+          See camera setup
+        </Link>
+        <Link
+          href="/live?demo=1"
+          className="flex flex-1 items-center justify-center gap-2 rounded-xl border border-foreground/5 bg-foreground/[0.02] px-4 py-3 text-sm font-medium text-muted-foreground transition-colors hover:bg-foreground/[0.04] hover:text-foreground"
+        >
+          <PlayCircle className="h-4 w-4" />
+          Watch live demo match
+        </Link>
+      </div>
+    </div>
   );
 }

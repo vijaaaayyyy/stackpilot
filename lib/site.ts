@@ -16,11 +16,19 @@ export type SiteConfig = {
   openGraph: { type: 'website'; siteName: string; locale: string };
 };
 
+function productionUrl(): string {
+  // On Vercel builds VERCEL_PROJECT_PRODUCTION_URL is injected with the real
+  // deployment domain, so canonical/OG URLS stay correct without hardcoding.
+  const vercel = process.env.VERCEL_PROJECT_PRODUCTION_URL;
+  if (vercel) return `https://${vercel}`;
+  return 'https://www.stack2set.me';
+}
+
 export const siteConfig: SiteConfig = {
   name: 'Turf DRS',
   shortName: 'Turf DRS',
   version: '4.4.4',
-  url: (process.env.NEXT_PUBLIC_SITE_URL ?? 'https://www.stack2set.me').replace(/\/+$/, ''),
+  url: (process.env.NEXT_PUBLIC_SITE_URL ?? productionUrl()).replace(/\/+$/, ''),
   title: 'Turf DRS — Bring the third umpire to your turf.',
   description:
     'Turf DRS delivers professional-style cricket reviews for local matches, turf cricket, academies and clubs — decisions you can trust.',

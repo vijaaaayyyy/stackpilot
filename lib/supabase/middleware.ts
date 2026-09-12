@@ -21,8 +21,6 @@ const AUTH_PAGES = ['/login', '/signup', '/forgot-password'];
 /* Old Stack2Set catalog routes — never shown again to signed-in users. */
 const LEGACY_PREFIXES = [
   '/workspace',
-  '/explore',
-  '/browse',
   '/stack',
   '/compare',
   '/category',

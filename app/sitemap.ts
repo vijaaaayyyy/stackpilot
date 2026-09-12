@@ -1,50 +1,24 @@
 import type { MetadataRoute } from 'next';
 import { absoluteUrl } from '@/lib/site';
 import { allDocs } from '@/lib/docs';
-import { providerService } from '@/lib/services/provider-service';
-
-export const dynamic = 'force-dynamic';
+import { DRS_REVIEW_TYPES, DRS_VENUES } from '@/lib/drs/browse';
 
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   const now = new Date();
 
-  // Categories and providers come from the configured store (hosted Supabase in
-  // production). The clean, indexable URL is `/browse/categories/{slug}` — never
-  // the legacy query-string route `/category?id=...`. If the catalog isn't
-  // seeded/available yet (first run, seed race), fall back to static pages only.
-  let dbCategories: Awaited<ReturnType<typeof providerService.getAllCategories>> = [];
-  let providers: Awaited<ReturnType<typeof providerService.getAllProviders>> = [];
-  try {
-    dbCategories = await providerService.getAllCategories();
-    providers = await providerService.getAllProviders();
-  } catch {
-    dbCategories = [];
-    providers = [];
-  }
+  const reviewTypePages: MetadataRoute.Sitemap = DRS_REVIEW_TYPES.map((item) => ({
+    url: absoluteUrl(`/browse/categories/${item.slug}`),
+    lastModified: now,
+    changeFrequency: 'weekly',
+    priority: 0.8,
+  }));
 
-  const categoryPages: MetadataRoute.Sitemap = dbCategories.map((category) => {
-    let lastModified = new Date(category.updatedAt);
-    if (Number.isNaN(lastModified.getTime())) lastModified = now;
-    return {
-      url: absoluteUrl(`/browse/categories/${category.slug}`),
-      lastModified,
-      changeFrequency: 'weekly',
-      priority: 0.8,
-    };
-  });
-
-  const providerPages: MetadataRoute.Sitemap = providers
-    .filter((p) => p.status === 'active')
-    .map((p) => {
-      let lastModified = new Date(p.updatedAt);
-      if (Number.isNaN(lastModified.getTime())) lastModified = now;
-      return {
-        url: absoluteUrl(`/browse/providers/${p.slug}`),
-        lastModified,
-        changeFrequency: 'weekly' as const,
-        priority: 0.7,
-      };
-    });
+  const venuePages: MetadataRoute.Sitemap = DRS_VENUES.map((venue) => ({
+    url: absoluteUrl(`/browse/providers/${venue.slug}`),
+    lastModified: now,
+    changeFrequency: 'weekly',
+    priority: 0.7,
+  }));
 
   const docPages: MetadataRoute.Sitemap = allDocs.map((doc) => ({
     url: absoluteUrl(`/docs/${doc.slug}`),
@@ -58,6 +32,9 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     '/explore',
     '/browse/providers',
     '/browse/categories',
+    '/cameras',
+    '/live',
+    '/reviews',
     '/pricing',
     '/changelog',
     '/api-reference',
@@ -82,14 +59,8 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
       changeFrequency: 'daily',
       priority: 1,
     },
-    {
-      url: absoluteUrl('/search'),
-      lastModified: now,
-      changeFrequency: 'weekly',
-      priority: 0.9,
-    },
-    ...categoryPages,
-    ...providerPages,
+    ...reviewTypePages,
+    ...venuePages,
     {
       url: absoluteUrl('/faq'),
       lastModified: now,

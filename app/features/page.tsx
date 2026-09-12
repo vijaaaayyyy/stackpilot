@@ -4,33 +4,33 @@ import { StaticPage } from '@/components/pages/static-page';
 export const metadata: Metadata = {
   title: 'Features',
   description:
-    'Explore Stack2Set features: AI project planning, API discovery, database recommendations, provider comparison, and stack building.',
+    'Turf DRS features: live match capture, instant replays, ball tracking and decision reviews for turf cricket.',
   alternates: { canonical: '/features' },
 };
 
 const sections = [
   {
     title: 'Core features',
-    body: 'Stack2Set turns a project idea into a complete technology blueprint — automatically.',
+    body: 'Turf DRS turns your turf pitch into a review-ready ground — capture, replay and decide in seconds.',
     items: [
-      { title: 'AI Project Planner', body: 'Describe your idea in plain English and get a complete project blueprint with recommended technologies.', href: '/docs/ai' },
-      { title: 'API Discovery', body: 'Find the right APIs for payments, email, search, maps, AI, and hundreds of other use cases.', href: '/docs/tech-discovery' },
-      { title: 'Database Discovery', body: 'Compare SQL, NoSQL, vector, and real-time databases to find the perfect fit for your data needs.', href: '/docs/databases' },
-      { title: 'Authentication Discovery', body: 'Explore auth providers — OAuth, magic links, biometrics — and pick the right one for your app.', href: '/docs/authentication' },
-      { title: 'Provider Comparison', body: 'Side-by-side comparisons of pricing, features, and performance across every category.', href: '/docs/compare' },
-      { title: 'Build & Save Stacks', body: 'Assemble technologies into a shareable tech stack and save your project plans.', href: '/docs/getting-started' },
+      { title: 'Live match control', body: 'Run a match end-to-end with live capture and a review button for every decision.', href: '/live' },
+      { title: 'Instant replay', body: 'Every delivery replayed cleanly, with slow motion kicking in at the business end.', href: '/review?from=demo' },
+      { title: 'Frame-by-frame analysis', body: 'Step frame by frame to time bails, creases, keepers and bat grounding.', href: '/review?type=runout&from=demo' },
+      { title: 'Ball tracking', body: 'Top-down trajectory with impact marker and projected wicket line.', href: '/browse/categories/ball-tracking' },
+      { title: 'Decision reviews', body: 'LBW, run out, stumping, caught behind and boundary reviews with clear OUT or NOT OUT.', href: '/browse/categories' },
+      { title: 'Review history', body: 'Every completed review is saved with its decision and timestamped frames.', href: '/reviews' },
     ],
   },
   {
-    title: 'Covered categories',
-    body: 'Recommendations span every layer of a modern application.',
+    title: 'Covered decisions',
+    body: 'Built for the calls that matter on turf.',
     items: [
-      { title: 'Authentication', body: 'Clerk, Auth0, Supabase Auth, NextAuth and more.', href: '/browse/categories/authentication' },
-      { title: 'Database', body: 'PostgreSQL, MongoDB, Redis, and vector databases.', href: '/browse/categories/database' },
-      { title: 'Storage', body: 'Cloudinary, S3, and object storage solutions.', href: '/browse/categories/storage' },
-      { title: 'Video APIs', body: 'Streaming, transcoding, and live video providers.', href: '/browse/categories/video-apis' },
-      { title: 'Email & Notifications', body: 'Transactional email and multi-channel notifications.', href: '/browse/categories/email' },
-      { title: 'Hosting & CDN', body: 'Vercel, Netlify, Cloudflare, and global CDNs.', href: '/browse/categories/hosting' },
+      { title: 'LBW Review', body: 'Pitching in line, height at impact and the projected wicket line.', href: '/browse/categories/lbw' },
+      { title: 'Run Out Review', body: 'Crease and bails timed frame-by-frame at both ends.', href: '/browse/categories/runout' },
+      { title: 'Stumping Review', body: 'Keeper gather timed against the grounding of the bat.', href: '/browse/categories/stumping' },
+      { title: 'Caught Behind', body: 'Contact frame matched to the audio spike from the boundary mics.', href: '/browse/categories/caught' },
+      { title: 'Boundary Review', body: 'Rope contact from the rope-level camera.', href: '/browse/categories/boundary' },
+      { title: 'Camera Setup', body: 'A two-camera rig — end-on and overhead — made for turf pitches.', href: '/browse/categories/cameras' },
     ],
   },
 ];
@@ -40,8 +40,8 @@ export default function FeaturesPage() {
     <StaticPage
       eyebrow="Features"
       title="Everything you need to"
-      highlight="build smarter"
-      description="Powerful tools to discover, compare, and assemble the perfect technology stack for any project."
+      highlight="review on turf"
+      description="Live capture, instant replays, ball tracking and clear decision reviews — built for turf cricket and ready at the press of review."
       sections={sections}
     />
   );

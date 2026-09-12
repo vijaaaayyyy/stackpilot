@@ -151,7 +151,7 @@ export function ReviewWorkstation({
     return () => {
       active = false;
     };
-  }, [reviewType, ball]);
+  }, [reviewType, ball, matchId]);
 
   const flashFor = useCallback((text: string, ms = 1100) => {
     setFlash(text);
@@ -537,7 +537,7 @@ export function ReviewWorkstation({
                       </p>
                       <h3 className="mt-1.5 text-base font-semibold tracking-tight text-foreground">{label}</h3>
                       <p className="mt-1 text-xs text-white/55">
-                        {reviewType === 'lbw' && 'Pitching line and wicket projection on the top-down pitch map.'}
+                        {reviewType === 'lbw' && 'Pitching line and wicket projection from the top-down camera.'}
                         {reviewType === 'caught' && 'Contact frame checked against the audio spike.'}
                         {reviewType === 'runout' && 'Crease + bails timed frame-by-frame.'}
                         {reviewType === 'stumping' && 'Keeper gather timed against bat grounding.'}

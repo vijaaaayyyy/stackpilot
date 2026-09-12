@@ -340,13 +340,13 @@ export function ThreeDrsScene({
       color: '#141e33',
       roughness: 0.9,
       transparent: true,
-      opacity: 0.7,
+      opacity: 0.55,
     });
-    const batter = new THREE.Mesh(new THREE.BoxGeometry(0.32, 0.85, 0.2), figureMat);
-    batter.position.set(0.05, 0.43, STUMP_Z + 0.42);
+    const batter = new THREE.Mesh(new THREE.CapsuleGeometry(0.13, 0.5, 4, 14), figureMat);
+    batter.position.set(0.45, 0.48, STUMP_Z + 0.42);
     scene.add(batter);
-    const bowler = new THREE.Mesh(new THREE.BoxGeometry(0.36, 0.9, 0.22), figureMat);
-    bowler.position.set(0.06, 0.45, -STUMP_Z - 0.6);
+    const bowler = new THREE.Mesh(new THREE.CapsuleGeometry(0.15, 0.55, 4, 14), figureMat);
+    bowler.position.set(0.85, 0.52, -STUMP_Z - 0.6);
     scene.add(bowler);
 
     /* ------------------------------ The ball ------------------------------ */

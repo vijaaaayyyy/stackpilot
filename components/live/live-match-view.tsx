@@ -39,6 +39,7 @@ import {
   type Point,
 } from '@/lib/drs/trajectory';
 import { cn } from '@/lib/utils';
+import { ClipRecorder, uploadClip } from '@/lib/drs/clips';
 
 type Delivery = {
   over: string;
@@ -484,6 +485,43 @@ export function LiveMatchView({
   const progressRef = useRef(0);
   const [seq, setSeq] = useState(0);
 
+  /* Umpire-end phone camera — live feed + rolling capture for the last delivery. */
+  const [camOn, setCamOn] = useState(false);
+  const [camErr, setCamErr] = useState<string | null>(null);
+  const [camSeconds, setCamSeconds] = useState(0);
+  const [camStream, setCamStream] = useState<MediaStream | null>(null);
+  const camRecorderRef = useRef<ClipRecorder | null>(null);
+  const camPreviewRef = useRef<HTMLVideoElement | null>(null);
+
+  useEffect(() => {
+    if (camStream && camPreviewRef.current) camPreviewRef.current.srcObject = camStream;
+  }, [camStream]);
+
+  useEffect(
+    () => () => {
+      camRecorderRef.current?.destroy().catch(() => undefined);
+    },
+    [],
+  );
+
+  const toggleCam = async () => {
+    if (camRecorderRef.current?.recording) {
+      await camRecorderRef.current.stop();
+      setCamOn(false);
+      setCamStream(null);
+      setCamSeconds(0);
+      return;
+    }
+    setCamErr(null);
+    const rec = new ClipRecorder();
+    rec.onTick = setCamSeconds;
+    rec.onError = (message) => setCamErr(message);
+    camRecorderRef.current = rec;
+    await rec.start();
+    setCamOn(rec.recording);
+    setCamStream(rec.stream);
+  };
+
   const delivery = DELIVERIES[index];
   const isDone = progress >= 1;
 
@@ -543,6 +581,29 @@ export function LiveMatchView({
     setReviewOpen(true);
   };
 
+  /* Cut the last ~12s of the phone's rolling capture (the final delivery),
+     upload it, then open the review on that clip. */
+  const goReview = async (type: string) => {
+    const camNow = camRecorderRef.current;
+    if (camNow?.recording) {
+      try {
+        const blob = await camNow.stop(true, 12);
+        if (blob) {
+          await uploadClip(blob, delivery.over, { durationMs: Math.round(camNow.seconds * 1000) });
+        }
+      } catch {
+        /* review still opens without a clip */
+      }
+      setCamOn(false);
+      setCamStream(null);
+      setCamSeconds(0);
+    }
+    setReviewOpen(false);
+    router.push(
+      `/review?type=${type}&ball=${delivery.over}&match=${matchId}&title=${encodeURIComponent(matchLabel)}${demo ? '&from=demo' : ''}`,
+    );
+  };
+
   /* Demo autopilot: play the final delivery, then auto-request the LBW review. */
   useEffect(() => {
     if (!demo) return;
@@ -595,6 +656,32 @@ export function LiveMatchView({
             </span>
           </div>
           <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={toggleCam}
+              disabled={!camOn && Boolean(camErr)}
+              className={cn(
+                'inline-flex h-7 items-center gap-1.5 rounded-full border px-2.5 font-mono text-[10px] font-semibold uppercase tracking-widest transition-colors',
+                camOn
+                  ? 'border-rose-500/50 bg-rose-500/15 text-rose-300'
+                  : camErr
+                    ? 'border-white/10 text-white/40'
+                    : 'border-white/15 bg-white/5 text-foreground/80 hover:border-rose-500/40 hover:text-rose-300',
+              )}
+              title={
+                camErr
+                  ? camErr
+                  : 'Put your phone at the umpire end to record the live feed — review cuts the last delivery.'
+              }
+            >
+              <span
+                className={cn(
+                  'h-1.5 w-1.5 rounded-full',
+                  camOn ? 'animate-pulse bg-rose-500' : 'bg-white/35',
+                )}
+              />
+              {camOn ? `REC ${Math.round(camSeconds)}s` : camErr ? 'CAM ERR' : 'UMPIRE CAM'}
+            </button>
             {slow && (
               <StatusPill tone="teal">Slow-Mo ×0.22</StatusPill>
             )}
@@ -603,6 +690,23 @@ export function LiveMatchView({
             </StatusPill>
           </div>
         </div>
+
+        {/* Phone camera at the umpire end — live feed overlay */}
+        {camOn && camStream && (
+          <div className="pointer-events-none absolute bottom-3 right-3 z-10 w-44 overflow-hidden rounded-lg border border-white/20 bg-black shadow-xl shadow-black/50">
+            <video
+              ref={camPreviewRef}
+              autoPlay
+              muted
+              playsInline
+              className="aspect-video h-full w-full object-cover"
+            />
+            <span className="absolute left-1.5 top-1.5 flex items-center gap-1 rounded bg-black/70 px-1.5 py-0.5 font-mono text-[9px] font-semibold uppercase tracking-widest text-rose-300">
+              <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-rose-500" />
+              Umpire cam
+            </span>
+          </div>
+        )}
 
         <div className="relative px-2 pb-2 sm:px-4">
           <style>{`
@@ -1137,12 +1241,7 @@ export function LiveMatchView({
         over={delivery.over}
         auto={demo}
         onClose={() => setReviewOpen(false)}
-        onDecision={(type) => {
-          setReviewOpen(false);
-          router.push(
-            `/review?type=${type}&ball=${delivery.over}&match=${matchId}&title=${encodeURIComponent(matchLabel)}${demo ? '&from=demo' : ''}`,
-          );
-        }}
+        onDecision={goReview}
       />
     </>
   );

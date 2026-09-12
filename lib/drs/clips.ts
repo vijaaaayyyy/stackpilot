@@ -64,10 +64,12 @@ export function deleteClip(ballId: string): void {
 export class ClipRecorder {
   private mediaStream: MediaStream | null = null;
   private recorder: MediaRecorder | null = null;
-  private chunks: Blob[] = [];
+  private chunks: { time: number; data: Blob }[] = [];
+  private keepLastSeconds = 0;
   private startedAt = 0;
   private timer: number | null = null;
   private elapsed = 0;
+  private doneResolve: ((blob: Blob | null) => void) | null = null;
 
   onTick: ((seconds: number) => void) | null = null;
   onDone: ((blob: Blob) => void) | null = null;
@@ -118,11 +120,23 @@ export class ClipRecorder {
     });
     this.chunks = [];
     this.recorder.ondataavailable = (event) => {
-      if (event.data.size > 0) this.chunks.push(event.data);
+      if (event.data.size > 0) this.chunks.push({ time: Date.now(), data: event.data });
     };
     this.recorder.onstop = () => {
-      const blob = new Blob(this.chunks, { type: this.recorder?.mimeType || mime });
+      let kept = this.chunks;
+      if (this.keepLastSeconds > 0) {
+        const windowStart = Date.now() - this.keepLastSeconds * 1000;
+        const within = kept.filter((chunk) => chunk.time >= windowStart);
+        if (within.length > 0) kept = within;
+        else kept = kept.slice(-1);
+      }
+      const blob = new Blob(
+        kept.map((chunk) => chunk.data),
+        { type: this.recorder?.mimeType || mime },
+      );
       if (blob.size > 0) this.onDone?.(blob);
+      this.doneResolve?.(blob.size > 0 ? blob : null);
+      this.doneResolve = null;
       this.stop(false).catch(() => undefined);
     };
     this.recorder.start(250);
@@ -134,23 +148,34 @@ export class ClipRecorder {
     }, 250);
   }
 
-  async stop(stopTracks = true): Promise<void> {
+  /**
+   * Stop capturing. `keepLastSeconds` trims the recording to just the last
+   * N seconds (e.g. the final delivery) when the review is triggered.
+   * Resolves with the captured blob (null if nothing was recorded yet).
+   */
+  async stop(stopTracks = true, keepLastSeconds = 0): Promise<Blob | null> {
     if (this.timer) {
       window.clearInterval(this.timer);
       this.timer = null;
     }
     this.elapsed = (Date.now() - this.startedAt) / 1000;
+    this.keepLastSeconds = keepLastSeconds;
+    let done: Promise<Blob | null> = Promise.resolve(null);
     if (this.recorder?.state === 'recording') {
+      done = new Promise<Blob | null>((resolve) => {
+        this.doneResolve = resolve;
+      });
       this.recorder.stop();
     }
     if (stopTracks && this.mediaStream) {
       this.mediaStream.getTracks().forEach((track) => track.stop());
       this.mediaStream = null;
     }
+    return done;
   }
 
   destroy(): Promise<void> {
-    return this.stop(true);
+    return this.stop(true).then(() => undefined);
   }
 }
 

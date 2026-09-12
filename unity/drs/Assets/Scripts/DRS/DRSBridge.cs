@@ -288,32 +288,80 @@ namespace TurfDRS
 
         private void AddStumps(Transform parent, float z)
         {
+            // Three tapered-looking stumps: trunk + broadcast collar + dark base.
             for (int i = -1; i <= 1; i++)
             {
-                var stump = GameObject.CreatePrimitive(PrimitiveType.Cylinder);
-                stump.name = "Stump";
-                stump.transform.SetParent(parent, false);
-                stump.transform.localScale = new Vector3(0.09f, StumpHeight, 0.09f);
-                stump.transform.position = new Vector3(i * 0.09f, StumpHeight / 2f, z);
-                stump.GetComponent<Renderer>().sharedMaterial = new Material(Shader.Find("Standard"))
-                {
-                    color = new Color(0.62f, 0.4f, 0.15f), smoothness = 0.5f,
-                };
+                float x = i * 0.11f;
+                var trunk = GameObject.CreatePrimitive(PrimitiveType.Cylinder);
+                trunk.name = "Stump";
+                trunk.transform.SetParent(parent, false);
+                trunk.transform.localScale = new Vector3(0.09f, StumpHeight, 0.09f);
+                trunk.transform.localPosition = new Vector3(x, StumpHeight / 2f, 0f);
+                trunk.GetComponent<Renderer>().sharedMaterial = StumpWood();
+
+                var collar = GameObject.CreatePrimitive(PrimitiveType.Cylinder);
+                collar.name = "Stump Ring";
+                collar.transform.SetParent(parent, false);
+                collar.transform.localScale = new Vector3(0.104f, 0.04f, 0.104f);
+                collar.transform.localPosition = new Vector3(x, StumpHeight - 0.05f, 0f);
+                collar.GetComponent<Renderer>().sharedMaterial = DarkWood();
+
+                var baseSkirt = GameObject.CreatePrimitive(PrimitiveType.Cylinder);
+                baseSkirt.name = "Stump Base";
+                baseSkirt.transform.SetParent(parent, false);
+                baseSkirt.transform.localScale = new Vector3(0.112f, 0.09f, 0.112f);
+                baseSkirt.transform.localPosition = new Vector3(x, 0.045f, 0f);
+                baseSkirt.GetComponent<Renderer>().sharedMaterial = DarkWood();
             }
-            for (int k = 0; k < 2; k++)
+
+            // Two bails (barrel + knobs) resting in the grooves between stumps.
+            foreach (var bx in new float[] { -0.055f, 0.055f })
             {
-                var bail = GameObject.CreatePrimitive(PrimitiveType.Cylinder);
-                float x = k == 0 ? -0.09f : 0.09f;
-                bail.name = "Bail";
-                bail.transform.SetParent(parent, false);
-                bail.transform.localScale = new Vector3(0.07f, 0.08f, 0.07f);
-                bail.transform.position = new Vector3(x, StumpHeight + 0.04f, z);
-                bail.transform.localRotation = Quaternion.Euler(0f, 0f, 0f);
-                bail.GetComponent<Renderer>().sharedMaterial = new Material(Shader.Find("Standard"))
+                var barrel = GameObject.CreatePrimitive(PrimitiveType.Cylinder);
+                barrel.name = "Bail";
+                barrel.transform.SetParent(parent, false);
+                barrel.transform.localScale = new Vector3(0.03f, 0.08f, 0.03f);
+                barrel.transform.localRotation = Quaternion.Euler(0f, 0f, 90f);
+                barrel.transform.localPosition = new Vector3(bx, StumpHeight + 0.012f, 0f);
+                barrel.GetComponent<Renderer>().sharedMaterial = BailWood();
+
+                foreach (var kx in new float[] { -0.0775f, 0.0775f })
                 {
-                    color = new Color(0.96f, 0.87f, 0.66f), smoothness = 0.7f,
-                };
+                    var knob = GameObject.CreatePrimitive(PrimitiveType.Sphere);
+                    knob.name = "Bail Knob";
+                    knob.transform.SetParent(parent, false);
+                    knob.transform.localScale = Vector3.one * 0.042f;
+                    knob.transform.localPosition = new Vector3(bx + kx, StumpHeight + 0.012f, 0f);
+                    knob.GetComponent<Renderer>().sharedMaterial = BailWood();
+                }
             }
+        }
+
+        private static Material StumpWood()
+        {
+            return new Material(Shader.Find("Standard"))
+            {
+                color = new Color(0.81f, 0.62f, 0.45f),
+                smoothness = 0.35f,
+            };
+        }
+
+        private static Material DarkWood()
+        {
+            return new Material(Shader.Find("Standard"))
+            {
+                color = new Color(0.43f, 0.27f, 0.15f),
+                smoothness = 0.25f,
+            };
+        }
+
+        private static Material BailWood()
+        {
+            return new Material(Shader.Find("Standard"))
+            {
+                color = new Color(0.96f, 0.88f, 0.70f),
+                smoothness = 0.6f,
+            };
         }
 
         private static Material Solid(Color color)

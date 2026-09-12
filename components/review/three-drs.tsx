@@ -8,6 +8,7 @@
 import { useEffect, useRef } from 'react';
 import * as THREE from 'three';
 import { RoomEnvironment } from 'three/examples/jsm/environments/RoomEnvironment.js';
+import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
 import {
   BOUNCE,
   BOUNCE_T,
@@ -75,24 +76,95 @@ function padWorld(): THREE.Vector3 {
 
 /* ------------------------------- Stumps -------------------------------- */
 
-function makeStumps(color = '#e7b27d'): THREE.Group {
+/** Procedural wood grain — no asset files needed. */
+function makeWoodTexture(light = '#cf9f72', dark = '#8a5a2b'): THREE.CanvasTexture {
+  const size = 256;
+  const canvas = document.createElement('canvas');
+  canvas.width = size;
+  canvas.height = size;
+  const ctx = canvas.getContext('2d');
+  if (!ctx) return new THREE.CanvasTexture(canvas);
+  ctx.fillStyle = light;
+  ctx.fillRect(0, 0, size, size);
+  for (let i = 0; i < 42; i++) {
+    ctx.strokeStyle = Math.random() > 0.42 ? dark : '#f0d9aa';
+    ctx.lineWidth = 0.8 + Math.random() * 2.4;
+    ctx.globalAlpha = 0.22 + Math.random() * 0.45;
+    const x = Math.random() * size;
+    ctx.beginPath();
+    ctx.moveTo(x, -6);
+    ctx.bezierCurveTo(
+      x + (Math.random() * 22 - 11),
+      size * 0.28,
+      x + (Math.random() * 22 - 11),
+      size * 0.62,
+      x + (Math.random() * 16 - 8),
+      size + 6,
+    );
+    ctx.stroke();
+  }
+  ctx.globalAlpha = 1;
+  const tex = new THREE.CanvasTexture(canvas);
+  tex.wrapS = THREE.RepeatWrapping;
+  tex.wrapT = THREE.RepeatWrapping;
+  tex.colorSpace = THREE.SRGBColorSpace;
+  return tex;
+}
+
+/**
+ * Realistic stump set: three tapered wood stumps with a broadcast ring and a
+ * dark base skirt, plus two bails (barrel + knobs) resting in the grooves.
+ * Meshes tagged userData.highlight are the ones that pulse when the verdict is
+ * "hitting".
+ */
+function makeStumps(): THREE.Group {
   const group = new THREE.Group();
-  const wood = new THREE.MeshStandardMaterial({ color, roughness: 0.7, metalness: 0.05 });
-  const bailMat = new THREE.MeshStandardMaterial({ color: '#f6dea8', roughness: 0.55 });
+  const woodTex = makeWoodTexture();
+  const wood = new THREE.MeshStandardMaterial({ map: woodTex, color: 0xffffff, roughness: 0.65, metalness: 0.04 });
+  const darkWood = new THREE.MeshStandardMaterial({ color: '#6f4527', roughness: 0.9 });
+  const bailMat = new THREE.MeshStandardMaterial({ map: woodTex, color: 0xffffff, roughness: 0.35, metalness: 0.05 });
 
-  const makeStump = (x: number) => {
-    const stump = new THREE.Mesh(new THREE.CylinderGeometry(0.045, 0.045, STUMP_HEIGHT, 16), wood);
-    stump.position.set(x, STUMP_HEIGHT / 2, 0);
+  const GROOVE_Y = STUMP_HEIGHT + 0.012;
+
+  const makeStump = (x: number, jitter: number) => {
+    const stump = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.041, 0.052, STUMP_HEIGHT, 20),
+      wood,
+    );
+    stump.position.set(x, STUMP_HEIGHT / 2, jitter);
+    stump.userData.highlight = true;
     group.add(stump);
-  };
-  makeStump(-0.11);
-  makeStump(0);
-  makeStump(0.11);
 
-  const bail = new THREE.Mesh(new THREE.CylinderGeometry(0.035, 0.035, 0.34, 10), bailMat);
-  bail.rotation.x = Math.PI / 2;
-  bail.position.set(0, STUMP_HEIGHT + 0.03, 0);
-  group.add(bail);
+    /* Broadcast ring near the top */
+    const ring = new THREE.Mesh(new THREE.TorusGeometry(0.047, 0.011, 8, 24), darkWood);
+    ring.rotation.x = Math.PI / 2;
+    ring.position.set(x, STUMP_HEIGHT - 0.05, jitter);
+    group.add(ring);
+
+    /* Dark base skirt */
+    const base = new THREE.Mesh(new THREE.CylinderGeometry(0.052, 0.056, 0.09, 20), darkWood);
+    base.position.set(x, 0.045, jitter);
+    group.add(base);
+  };
+  makeStump(-0.112, 0.01);
+  makeStump(0, -0.008);
+  makeStump(0.112, 0.006);
+
+  const makeBail = (x: number) => {
+    const barrel = new THREE.Mesh(new THREE.CylinderGeometry(0.0145, 0.0145, 0.145, 12), bailMat);
+    barrel.rotation.z = Math.PI / 2;
+    barrel.position.set(x, GROOVE_Y, 0);
+    barrel.userData.highlight = true;
+    group.add(barrel);
+    [-0.0775, 0.0775].forEach((dx) => {
+      const knob = new THREE.Mesh(new THREE.SphereGeometry(0.021, 12, 10), bailMat);
+      knob.position.set(x + dx, GROOVE_Y, 0);
+      knob.userData.highlight = true;
+      group.add(knob);
+    });
+  };
+  makeBail(-0.056);
+  makeBail(0.056);
 
   return group;
 }
@@ -370,15 +442,38 @@ export function ThreeDrsScene({
       top: { pos: TOP_POS, look: TOP_LOOK },
       square: { pos: SQUARE_POS, look: SQUARE_LOOK },
     };
-    let fromView: DrsView = 'umpire';
     let activeView: DrsView | null = null;
     let transitionT = 1;
-    const camPos = UMPIRE_POS.clone();
-    const camLook = UMPIRE_LOOK.clone();
+    const fromPos = UMPIRE_POS.clone();
+
+    /* Orbit — the user can drag to rotate freely. Rig switches animate the
+       camera back to the requested view unless the user is mid-drag. */
+    const controls = new OrbitControls(camera, renderer.domElement);
+    controls.enableDamping = true;
+    controls.dampingFactor = 0.08;
+    controls.enablePan = false;
+    controls.enableZoom = false;
+    controls.enableRotate = true;
+    controls.minDistance = 1.2;
+    controls.maxDistance = 14;
+    controls.minPolarAngle = 0.12;
+    controls.maxPolarAngle = 1.52;
+    controls.target.set(0, 0.4, 0.8);
+    camera.position.copy(UMPIRE_POS);
+    controls.update();
+
+    let userOrbiting = false;
+    controls.addEventListener('start', () => {
+      userOrbiting = true;
+      transitionT = 1;
+    });
+    controls.addEventListener('end', () => {
+      userOrbiting = false;
+    });
 
     const setViewTarget = (next: DrsView) => {
       if (activeView === next) return;
-      fromView = activeView === null ? 'umpire' : activeView;
+      fromPos.copy(camera.position);
       activeView = next;
       transitionT = 0;
     };
@@ -403,21 +498,17 @@ export function ThreeDrsScene({
       /* Corridor is LBW context only */
       corridorGroup.visible = s.type === 'lbw';
 
-      /* Camera transition — snaps on the first frame, then eases between rigs */
+      /* Camera — animate toward the requested rig, but hands off when the
+         user is orbiting. */
       setViewTarget(s.view);
-      if (transitionT >= 1) {
-        camPos.copy(RIG[activeView === null ? 'umpire' : activeView].pos);
-        camLook.copy(RIG[activeView === null ? 'umpire' : activeView].look);
-      } else {
+      if (transitionT < 1 && !userOrbiting) {
         transitionT = Math.min(transitionT + dt / 0.45, 1);
         const ease = 1 - Math.pow(1 - transitionT, 3);
-        const from = RIG[fromView];
-        const to = RIG[activeView === null ? 'umpire' : activeView];
-        camPos.lerpVectors(from.pos, to.pos, ease);
-        camLook.lerpVectors(from.look, to.look, ease);
+        camera.position.lerpVectors(fromPos, RIG[activeView === null ? 'umpire' : activeView].pos, ease);
+      } else {
+        transitionT = 1;
       }
-      camera.position.copy(camPos);
-      camera.lookAt(camLook);
+      controls.update();
 
       /* Ball */
       const p = atImpact ? PAD : deliveryPosition(outcome, s.progress);
@@ -445,7 +536,7 @@ export function ThreeDrsScene({
       projectionTip.visible = showProjection && !atImpact;
       const hitting = showProjection && s.verdict === 'hitting';
       batterStumps.children.forEach((child) => {
-        if (child instanceof THREE.Mesh) {
+        if (child instanceof THREE.Mesh && child.userData.highlight) {
           const mat = child.material as THREE.MeshStandardMaterial;
           if (hitting) {
             mat.emissive.setHex(0x2dd4bf);
@@ -500,6 +591,7 @@ export function ThreeDrsScene({
     return () => {
       cancelAnimationFrame(raf);
       ro.disconnect();
+      controls.dispose();
       pmrem.dispose();
       scene.traverse((obj) => {
         const mesh = obj as THREE.Mesh;

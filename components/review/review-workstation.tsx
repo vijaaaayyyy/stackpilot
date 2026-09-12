@@ -14,6 +14,7 @@ import {
   Scale,
   ScanLine,
   ShieldAlert,
+  Video,
   X,
   ZoomIn,
   ZoomOut,
@@ -27,6 +28,9 @@ import {
 } from '@/lib/drs/trajectory';
 import { demoService, onFieldFor, reasonFor } from '@/lib/drs/demo-service';
 import { saveReview } from '@/lib/drs/store';
+import { deleteClip, getClip, type ReviewClip } from '@/lib/drs/clips';
+import { FootageCapture } from '@/components/review/footage-capture';
+import { FootagePlayer } from '@/components/review/footage-player';
 import type { Decision, Review, ReviewEvidence, ReviewTypeId } from '@/lib/drs/types';
 import { cn } from '@/lib/utils';
 
@@ -126,6 +130,8 @@ export function ReviewWorkstation({
   const [zoom, setZoom] = useState(1);
   const [overlays, setOverlays] = useState(false);
   const [flash, setFlash] = useState<string | null>(null);
+  const [clip, setClip] = useState<ReviewClip | null>(null);
+  const [footageOpen, setFootageOpen] = useState(false);
 
   const progressRef = useRef(0);
   const autoRef = useRef(true);
@@ -152,6 +158,22 @@ export function ReviewWorkstation({
       active = false;
     };
   }, [reviewType, ball, matchId]);
+
+  /* Phone footage clip for this ball — read from the local index + listen for changes */
+  useEffect(() => {
+    setClip(getClip(ball));
+    const onChange = () => setClip(getClip(ball));
+    const onDetach = () => {
+      deleteClip(ball);
+      setClip(null);
+    };
+    window.addEventListener('turf-drs:clips-changed', onChange);
+    window.addEventListener('turf-drs:clip-detached', onDetach);
+    return () => {
+      window.removeEventListener('turf-drs:clips-changed', onChange);
+      window.removeEventListener('turf-drs:clip-detached', onDetach);
+    };
+  }, [ball]);
 
   const flashFor = useCallback((text: string, ms = 1100) => {
     setFlash(text);
@@ -368,7 +390,12 @@ export function ReviewWorkstation({
         decision,
         onField: onFieldFor(reviewType),
       });
-      review = { ...review, matchLabel };
+      review = {
+        ...review,
+        matchLabel,
+        clipPath: clip?.path,
+        clipUrl: clip?.url,
+      };
       await saveReview(review);
     } catch {
       /* still navigate so the user is never stranded */
@@ -390,6 +417,35 @@ export function ReviewWorkstation({
         : 'Decision: NOT OUT';
 
   const scope = phase === 'reveal' ? 'reveal' : phase === 'analysis' ? 'analysis' : 'capture';
+
+  /* Uploadable phone footage — record from the umpire end or attach a saved clip */
+  const footagePanel = (
+    <div className="space-y-2">
+      {clip ? (
+        <>
+          <FootagePlayer src={clip.url} title={`Ball ${ball}`} />
+          <p className="text-[10px] leading-relaxed text-white/45">
+            {clip.url.startsWith('blob:')
+              ? 'Saved on this device. No storage bucket yet — set up drs-clips to keep it in the cloud.'
+              : 'Uploaded to the drs-clips bucket.'}
+          </p>
+          <button
+            type="button"
+            onClick={() => {
+              deleteClip(ball);
+              setClip(null);
+            }}
+            className="inline-flex h-8 items-center gap-1.5 rounded-lg border border-white/10 px-2.5 text-xs font-medium text-white/60 transition-colors hover:text-rose-300"
+          >
+            <RotateCcw className="h-3.5 w-3.5" />
+            Re-record
+          </button>
+        </>
+      ) : (
+        <FootageCapture ballId={ball} initial={null} onClip={setClip} />
+      )}
+    </div>
+  );
 
   return (
     <motion.div
@@ -527,22 +583,65 @@ export function ReviewWorkstation({
               )}
             </div>
 
+            {/* Mobile footage drawer — desktop uses the sidebar version */}
+            <div className="lg:hidden">
+              <button
+                type="button"
+                onClick={() => setFootageOpen((value) => !value)}
+                className={cn(
+                  'absolute bottom-4 right-4 z-30 inline-flex h-10 items-center gap-2 rounded-full border px-4 font-mono text-[10px] font-semibold uppercase tracking-[0.18em] backdrop-blur-sm transition-colors',
+                  footageOpen
+                    ? 'border-amber-400/40 bg-amber-400/15 text-amber-300'
+                    : 'border-white/10 bg-black/70 text-white/70 hover:text-white',
+                )}
+              >
+                <Video className="h-3.5 w-3.5" />
+                Footage
+              </button>
+              {footageOpen && (
+                <div className="absolute inset-x-0 bottom-0 z-30 max-h-[60%] overflow-y-auto border-t border-white/10 bg-[#0a0e16]/95 p-4 backdrop-blur-md">
+                  <div className="mb-2 flex items-center justify-between">
+                    <span className="font-mono text-[10px] font-semibold uppercase tracking-[0.24em] text-white/45">
+                      Phone footage
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => setFootageOpen(false)}
+                      aria-label="Close footage panel"
+                      className="rounded-lg border border-white/10 p-1.5 text-white/50 hover:text-white"
+                    >
+                      <X className="h-3.5 w-3.5" />
+                    </button>
+                  </div>
+                  {footagePanel}
+                </div>
+              )}
+            </div>
+
             {/* Evidence sidebar — desktop */}
             <aside aria-label="Review evidence" className="hidden shrink-0 flex-col border-l border-white/10 bg-[#0a0e16]/80 lg:flex">
               <div className="space-y-5 overflow-y-auto p-5">
                 <div>
-<p className="flex items-center gap-1.5 font-mono text-[10px] font-semibold uppercase tracking-[0.24em] text-white/45">
-                        <Scale className="h-3 w-3" />
-                        Frame Analysis
-                      </p>
-                      <h3 className="mt-1.5 text-base font-semibold tracking-tight text-foreground">{label}</h3>
-                      <p className="mt-1 text-xs text-white/55">
-                        {reviewType === 'lbw' && 'Pitching line and wicket projection from the top-down camera.'}
-                        {reviewType === 'caught' && 'Contact frame checked against the audio spike.'}
-                        {reviewType === 'runout' && 'Crease + bails timed frame-by-frame.'}
-                        {reviewType === 'stumping' && 'Keeper gather timed against bat grounding.'}
-                        {reviewType === 'boundary' && 'Rope contact checked from the rope camera.'}
-                      </p>
+                  <p className="flex items-center gap-1.5 font-mono text-[10px] font-semibold uppercase tracking-[0.24em] text-white/45">
+                    <Video className="h-3 w-3" />
+                    Phone footage · Umpire end
+                  </p>
+                  {footagePanel}
+                </div>
+
+                <div>
+                  <p className="flex items-center gap-1.5 font-mono text-[10px] font-semibold uppercase tracking-[0.24em] text-white/45">
+                    <Scale className="h-3 w-3" />
+                    Frame Analysis
+                  </p>
+                  <h3 className="mt-1.5 text-base font-semibold tracking-tight text-foreground">{label}</h3>
+                  <p className="mt-1 text-xs text-white/55">
+                    {reviewType === 'lbw' && 'Pitching line and wicket projection from the top-down camera.'}
+                    {reviewType === 'caught' && 'Contact frame checked against the audio spike.'}
+                    {reviewType === 'runout' && 'Crease + bails timed frame-by-frame.'}
+                    {reviewType === 'stumping' && 'Keeper gather timed against bat grounding.'}
+                    {reviewType === 'boundary' && 'Rope contact checked from the rope camera.'}
+                  </p>
                 </div>
 
                 {/* Live capture indicator */}

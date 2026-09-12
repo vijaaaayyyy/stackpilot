@@ -177,6 +177,9 @@ export async function uploadClip(
       url = '';
     }
   }
+  if (!url && typeof window !== 'undefined') {
+    url = URL.createObjectURL(blob);
+  }
   const clip: ReviewClip = {
     ballId,
     name: `delivery-${ballId}.webm`,

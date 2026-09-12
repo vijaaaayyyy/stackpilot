@@ -31,7 +31,7 @@ export const siteConfig: SiteConfig = {
   url: (process.env.NEXT_PUBLIC_SITE_URL ?? productionUrl()).replace(/\/+$/, ''),
   title: 'Turf DRS — Bring the third umpire to your turf.',
   description:
-    'Turf DRS delivers professional-style cricket reviews for local matches, turf cricket, academies and clubs — decisions you can trust.',
+    'Turf DRS brings third-umpire reviews to local cricket — LBW, run-out and stumping checks, ball tracking and slow-mo footage for turf, academy and club matches.',
   keywords: [
     'Turf DRS',
     'cricket',

@@ -145,8 +145,8 @@ const DEMO_REVIEW: LastReviewRow = {
   status: 'OVERTURNED',
   reason:
     'Pitch impact in line with the stumps, below the bails; the projected path carries onto the middle stump.',
-  ball_id: '16.4',
-  match_label: 'Sample delivery',
+  ball_id: 'Sample delivery',
+  match_label: 'Standalone review',
   created_at: new Date(Date.now() - 1000 * 60 * 60 * 5).toISOString(),
   clip_path: null,
 };
@@ -195,7 +195,7 @@ export async function LastReview() {
 
         <ReviewRow
           eyebrow={sample ? 'Sample review' : 'Your latest review'}
-          kicker={sample ? 'LBW — projected path onto the stumps' : (TYPE_LABEL[(row.type ?? '').toLowerCase()] ?? 'Review')}
+          kicker={sample ? 'LBW — project the line onto the stumps' : (TYPE_LABEL[(row.type ?? '').toLowerCase()] ?? 'Review')}
           type={TYPE_LABEL[(row.type ?? 'lbw').toLowerCase()] ?? 'Review'}
           decision={row.decision ?? 'INCONCLUSIVE'}
           onField={row.on_field ?? 'INCONCLUSIVE'}

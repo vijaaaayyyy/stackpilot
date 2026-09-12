@@ -8,14 +8,12 @@ import {
   ChevronRight,
   Film,
   Loader2,
-  ScanLine,
   ShieldAlert,
   Square,
   UploadCloud,
 } from 'lucide-react';
 import { ClipRecorder, uploadClip } from '@/lib/drs/clips';
 import { saveDraftReview } from '@/lib/drs/store';
-import { currentDelivery, nextDelivery, type DeliveryHandle } from '@/lib/drs/delivery-counter';
 import { isRolling, rollingRecorder, stopRollingRecorder } from '@/lib/drs/rolling-cam';
 import { cn } from '@/lib/utils';
 
@@ -39,19 +37,12 @@ type UploadState =
   | { status: 'done'; message: string }
   | { status: 'error'; message: string };
 
-export function ReviewConsole({
-  demo = false,
-  matchId = 'demo-live',
-  matchLabel = 'Falcons vs Strikers · Hyderabad Turf League',
-  justReviewedBall = null,
-}: {
-  demo?: boolean;
-  matchId?: string;
-  matchLabel?: string;
-  justReviewedBall?: string | null;
-}) {
+function newClipId(): string {
+  return `clip-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`;
+}
+
+export function ReviewConsole() {
   const router = useRouter();
-  const [delivery, setDelivery] = useState<DeliveryHandle>(() => currentDelivery(matchId));
   const [type, setType] = useState<string>('lbw');
 
   const [camOn, setCamOn] = useState(false);
@@ -59,7 +50,7 @@ export function ReviewConsole({
   const [camSeconds, setCamSeconds] = useState(0);
   const [camStream, setCamStream] = useState<MediaStream | null>(null);
   const [upload, setUpload] = useState<UploadState>({ status: 'idle' });
-  const [recordedBalls, setRecordedBalls] = useState<string[]>([]);
+  const [recordedClips, setRecordedClips] = useState<string[]>([]);
   const camRecorderRef = useRef<ClipRecorder | null>(null);
   const camPreviewRef = useRef<HTMLVideoElement | null>(null);
 
@@ -80,15 +71,6 @@ export function ReviewConsole({
     setCamStream(rec.stream);
     setCamSeconds(rec.seconds);
   }, []);
-
-  /* Returning from a review — advance the delivery counter to the next ball
-     so the loop continues, while the rolling buffer keeps recording. */
-  useEffect(() => {
-    if (!justReviewedBall) return;
-    if (currentDelivery(matchId).label === justReviewedBall) {
-      setDelivery(nextDelivery(matchId));
-    }
-  }, [justReviewedBall, matchId]);
 
   const toggleCam = useCallback(async () => {
     if (camRecorderRef.current?.recording || isRolling()) {
@@ -111,7 +93,7 @@ export function ReviewConsole({
     setCamStream(rec.stream);
   }, []);
 
-  /* Cut the last ~15s of the rolling buffer, upload it as {match}/{ball}.webm,
+  /* Cut the last ~15s of the rolling buffer, upload it as a standalone clip,
      write the draft review row, then route to the review player. The buffer
      keeps rolling so the next delivery is captured too. */
   const requestReview = useCallback(async () => {
@@ -121,30 +103,33 @@ export function ReviewConsole({
       return;
     }
     setUpload({ status: 'uploading' });
+    const clipId = newClipId();
     try {
       const blob = camNow.snapshot(15);
       if (!blob) throw new Error('Buffer is still warming up — give it a moment, then try again.');
-      const { clip, ok } = await uploadClip(blob, delivery.label, {
-        matchId,
+      const { clip, ok } = await uploadClip(blob, clipId, {
         durationMs: Math.round(camNow.seconds * 1000),
       });
       if (ok) {
-        await saveDraftReview({ matchId, matchLabel, ballId: delivery.label, clipPath: clip.path });
+        await saveDraftReview({
+          matchId: 'standalone',
+          matchLabel: 'Standalone review',
+          ballId: clipId,
+          clipPath: clip.path,
+        });
       }
-      setRecordedBalls((items) => (items.includes(delivery.label) ? items : [...items, delivery.label]));
+      setRecordedClips((items) => (items.includes(clipId) ? items : [...items, clipId]));
       setUpload({
         status: 'done',
         message: ok
-          ? `Ball ${delivery.label} saved to the drs-clips bucket.`
-          : `Ball ${delivery.label} saved on this device.`,
+          ? 'Clip saved to the drs-clips bucket.'
+          : 'Clip saved on this device.',
       });
-      router.push(
-        `/review?type=${type}&ball=${delivery.label}&match=${matchId}&title=${encodeURIComponent(matchLabel)}${demo ? '&from=demo' : ''}`,
-      );
+      router.push(`/review?clip=${encodeURIComponent(clipId)}&type=${type}&from=live`);
     } catch (error) {
       setUpload({ status: 'error', message: error instanceof Error ? error.message : 'Upload failed.' });
     }
-  }, [camRecorderRef, delivery.label, matchId, matchLabel, type, demo, router]);
+  }, [camRecorderRef, type, router]);
 
   return (
     <div className="mx-auto grid max-w-6xl gap-6 lg:grid-cols-[minmax(0,1fr)_320px]">
@@ -171,7 +156,7 @@ export function ReviewConsole({
               CAM 01
             </span>
             <span className="rounded-full border border-foreground/10 bg-foreground/[0.03] px-2.5 py-1">
-              {camOn ? `${fmt(camSeconds)} · Rolling ${'15'}s` : 'Standby'}
+              {camOn ? `${fmt(camSeconds)} · Rolling 15s` : 'Standby'}
             </span>
           </div>
         </div>
@@ -229,7 +214,7 @@ export function ReviewConsole({
               />
               <div className="pointer-events-none absolute left-3 top-3 flex items-center gap-2 rounded-lg bg-black/70 px-2.5 py-1.5 font-mono text-[10px] font-semibold uppercase tracking-widest text-rose-300 backdrop-blur-sm">
                 <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-rose-500" />
-                Umpire cam · {delivery.label}
+                Umpire cam · rolling
               </div>
               {(upload.status === 'uploading' || upload.status === 'done') && (
                 <div className="pointer-events-none absolute right-3 top-3 rounded-lg bg-black/70 px-2.5 py-1.5 font-mono text-[10px] font-semibold uppercase tracking-widest text-teal-300 backdrop-blur-sm">
@@ -334,55 +319,46 @@ export function ReviewConsole({
         )}
       </div>
 
-      {/* Match / deliveries rail */}
+      {/* Side rail */}
       <aside className="space-y-4">
         <div className="overflow-hidden rounded-2xl border border-foreground/10 bg-[#0b0b14]/90 shadow-xl shadow-black/30">
           <div className="flex items-center justify-between border-b border-foreground/10 px-5 py-3.5">
             <div>
-              <p className="font-mono text-[10px] uppercase tracking-widest text-muted-foreground">Match</p>
-              <p className="mt-0.5 truncate text-sm font-semibold text-foreground">{matchLabel}</p>
+              <p className="font-mono text-[10px] uppercase tracking-widest text-muted-foreground">Session</p>
+              <p className="mt-0.5 truncate text-sm font-semibold text-foreground">Standalone reviews</p>
             </div>
             <span className="rounded-full border border-teal-500/30 bg-teal-500/10 px-2.5 py-1 font-mono text-[10px] font-semibold uppercase tracking-widest text-teal-300">
-              {delivery.label}
+              {recordedClips.length} sent
             </span>
           </div>
 
           <div className="space-y-3 p-5">
             <div>
               <p className="flex items-center gap-1.5 font-mono text-[10px] font-semibold uppercase tracking-[0.2em] text-muted-foreground">
-                <Film className="h-3.5 w-3.5" /> Next delivery
+                <Film className="h-3.5 w-3.5" /> Record one clip at a time
               </p>
-              <div className="mt-2 flex items-center justify-between rounded-xl border border-foreground/10 bg-foreground/[0.02] px-4 py-3">
-                <div>
-                  <p className="font-mono text-2xl font-bold tracking-tight text-foreground">
-                    {delivery.label}
-                  </p>
-                  <p className="mt-0.5 font-mono text-[10px] uppercase tracking-widest text-muted-foreground">
-                    Over {delivery.over} · Ball {delivery.ball}
-                  </p>
-                </div>
-                <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-amber-400/10 text-amber-300 ring-1 ring-amber-400/25">
-                  <ScanLine className="h-4 w-4" />
-                </span>
-              </div>
+              <p className="mt-2 text-xs leading-relaxed text-muted-foreground">
+                Keep the camera rolling. Each <span className="font-mono">Request Review</span> sends the
+                last 15 seconds to the review player as its own standalone clip.
+              </p>
             </div>
 
             <div>
               <p className="flex items-center gap-1.5 font-mono text-[10px] font-semibold uppercase tracking-[0.2em] text-muted-foreground">
-                <UploadCloud className="h-3.5 w-3.5" /> Recorded deliveries
+                <UploadCloud className="h-3.5 w-3.5" /> Sent to review
               </p>
-              {recordedBalls.length === 0 ? (
+              {recordedClips.length === 0 ? (
                 <p className="mt-2 text-xs leading-relaxed text-muted-foreground">
-                  No deliveries recorded yet — press RECORD, then Request Review after each ball.
+                  No clips sent yet — press RECORD, then Request Review after the delivery.
                 </p>
               ) : (
                 <div className="mt-2 flex flex-wrap gap-1.5">
-                  {recordedBalls.map((ball) => (
+                  {recordedClips.map((clipId) => (
                     <span
-                      key={ball}
+                      key={clipId}
                       className="rounded-lg border border-teal-500/30 bg-teal-500/10 px-2.5 py-1 font-mono text-[10px] font-semibold text-teal-300"
                     >
-                      {ball}
+                      {clipId}
                     </span>
                   ))}
                 </div>
@@ -397,9 +373,9 @@ export function ReviewConsole({
           </p>
           <ol className="mt-2.5 list-decimal space-y-1.5 pl-4">
             <li>RECORD rolls a 15-second buffer — older footage is always discarded.</li>
-            <li>After each delivery, pick the type and tap Request Review.</li>
-            <li>You get a signed clip routed to the review player; recording stays live.</li>
-            <li>Returning auto-advances the counter to the next delivery.</li>
+            <li>After the delivery, pick the review type and tap Request Review.</li>
+            <li>The last 15 seconds become a standalone clip routed to the review player.</li>
+            <li>Recorded live, review it, decide — your verdict is saved to the review log.</li>
           </ol>
         </div>
       </aside>

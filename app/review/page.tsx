@@ -26,40 +26,20 @@ export async function generateMetadata({ searchParams }: ReviewPageProps): Promi
   return {
     title: `${reviewTitle(type)} — Turf DRS`,
     description:
-      'Broadcast-style third umpire workstation. Upload a clip or record live — AI line-by-line evidence, slow-mo, frame-by-frame, and an OUT / NOT OUT decision.',
+      'Broadcast-style third umpire workstation. Upload a clip or record live — the actual clip plays frame-by-frame with the real audio strip, AI evidence, and an OUT / NOT OUT decision.',
     alternates: { canonical: '/review' },
   };
 }
 
 export default async function ReviewPage({ searchParams }: ReviewPageProps) {
   const params = await searchParams;
-  const clip = params?.clip?.trim();
+  const clip = params?.clip?.trim() || params?.ball?.trim() || '';
 
-  /* With review params -> the workstation. A `clip` param means a standalone
-     uploaded video review; otherwise it is the live console flow. */
-  if (params?.type || params?.ball || clip) {
-    const standalone = Boolean(clip);
-    const from = clip
-      ? 'upload'
-      : params.from === 'history' || params.from === 'demo'
-        ? params.from
-        : 'live';
+  /* With a clip -> the workstation (a standalone uploaded/live-captured clip). */
+  if (params?.type || clip) {
+    const from = params?.from === 'history' ? 'history' : params?.from === 'demo' ? 'demo' : params?.from === 'live' ? 'live' : 'upload';
 
-    return (
-      <ReviewWorkstation
-        type={params?.type ?? 'lbw'}
-        clipId={clip}
-        standalone={standalone}
-        ball={clip ?? params?.ball ?? '16.4'}
-        from={from}
-        matchId={params?.match ?? (standalone ? 'standalone' : 'demo-live')}
-        matchLabel={
-          standalone
-            ? 'Standalone review'
-            : params?.title?.trim() || 'Falcons vs Strikers · Hyderabad Turf League'
-        }
-      />
-    );
+    return <ReviewWorkstation type={params?.type ?? 'lbw'} clipId={clip} from={from} />;
   }
 
   return (
@@ -68,7 +48,7 @@ export default async function ReviewPage({ searchParams }: ReviewPageProps) {
         eyebrow="Turf DRS"
         title="Third-Umpire"
         highlight="Review Deck"
-        description="Review any delivery — upload a clip from your phone or record it live. Turf DRS AI pins the evidence, you rule on it."
+        description="Review any delivery — upload a clip from your phone or record it live. Turf DRS AI pins the evidence on the real footage, you rule on it."
       />
       <div className="mt-12">
         <ReviewHub />

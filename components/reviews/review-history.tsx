@@ -27,13 +27,13 @@ function statusLabel(status: Review['status']) {
   return { label: 'Inconclusive', classes: 'text-muted-foreground bg-foreground/[0.06] ring-foreground/15' };
 }
 
-export function ReviewHistory({ matchLabel = 'Falcons vs Strikers · HTL' }: { matchLabel?: string }) {
+export function ReviewHistory() {
   const router = useRouter();
   const reduceMotion = useReducedMotion();
   const { reviews, loading, error } = useReviews();
 
   const openReview = (review: Review) => {
-    router.push(`/review?type=${review.type}&ball=${review.ballId}&from=history`);
+    router.push(`/review?clip=${encodeURIComponent(review.ballId)}&type=${review.type}&from=history`);
   };
 
   if (loading) {
@@ -66,16 +66,16 @@ export function ReviewHistory({ matchLabel = 'Falcons vs Strikers · HTL' }: { m
             No reviews yet
           </h3>
           <p className="mt-1 max-w-sm text-sm text-muted-foreground">
-            Start a demo match, request an LBW review, and decide it in the workstation — it will
+            Upload a delivery clip or record one live, then decide it in the workstation — it will
             appear here with the full history.
           </p>
           <button
             type="button"
-            onClick={() => router.push('/live?demo=1')}
+            onClick={() => router.push('/review')}
             className="mt-6 inline-flex h-11 items-center justify-center gap-2 rounded-xl bg-teal-500 px-6 text-sm font-semibold text-white shadow-lg shadow-teal-500/25 transition-all hover:bg-teal-600 hover:shadow-teal-500/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-500/40"
           >
             <Play className="h-4 w-4" />
-            START DEMO MATCH
+            START A REVIEW
           </button>
         </div>
       ) : (
@@ -112,7 +112,7 @@ export function ReviewHistory({ matchLabel = 'Falcons vs Strikers · HTL' }: { m
                   </span>
                   <span className="min-w-0">
                     <span className="block truncate text-sm font-semibold text-foreground">
-                      {matchLabel}
+                      {review.matchLabel}
                     </span>
                     <span className="mt-0.5 flex items-center gap-1.5 text-xs text-muted-foreground">
                       <Clock className="h-3 w-3" />

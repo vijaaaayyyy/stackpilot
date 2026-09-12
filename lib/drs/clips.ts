@@ -209,19 +209,16 @@ export type ClipUploadResult = { clip: ReviewClip; ok: boolean };
 
 /**
  * Upload a captured blob to Supabase Storage (`drs-clips` private bucket,
- * `{match_id}/{ball_id}.webm`, or `{owner_id}/{ball_id}.webm` outside a match)
- * and refresh the local index. The returned clip carries a time-limited signed
- * URL for playback; callers should re-resolve via `resolveClipUrl` once it
- * expires.
+ * `standalone/{clip_id}.webm`) and refresh the local index. The returned clip
+ * carries a time-limited signed URL for playback; callers should re-resolve
+ * via `resolveClipUrl` once it expires.
  */
 export async function uploadClip(
   blob: Blob,
-  ballId: string,
-  metadata?: { matchId?: string; durationMs?: number },
+  clipId: string,
+  metadata?: { durationMs?: number },
 ): Promise<ClipUploadResult> {
-  const owner = await currentUserId();
-  const folder = metadata?.matchId || owner;
-  const clip = await uploadBlob(blob, ballId, folder, '.webm', metadata?.durationMs);
+  const clip = await uploadBlob(blob, clipId, 'standalone', '.webm', metadata?.durationMs);
   return { clip, ok: Boolean(clip.url) && !clip.url.startsWith('blob:') };
 }
 

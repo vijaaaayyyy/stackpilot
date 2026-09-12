@@ -4,8 +4,8 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { AnimatePresence, motion, useReducedMotion } from 'framer-motion';
 import {
-  Activity,
-  Camera,
+  ArrowRight,
+  AlertTriangle,
   ChevronLeft,
   ChevronRight,
   Loader2,
@@ -13,7 +13,6 @@ import {
   Play,
   RotateCcw,
   Scale,
-  ScanLine,
   ShieldAlert,
   Sparkles,
   Video,
@@ -22,18 +21,12 @@ import {
   ZoomOut,
 } from 'lucide-react';
 import dynamic from 'next/dynamic';
-import { SnickAudio } from '@/components/review/snick-audio';
-import { DecisionReveal } from '@/components/review/decision-reveal';
-import {
-  BOUNCE_T as BALL_BOUNCE_T,
-  IMPACT_T as BALL_IMPACT_T,
-} from '@/lib/drs/trajectory';
-import { demoService, onFieldFor, reasonFor } from '@/lib/drs/demo-service';
+import { SnickMeter } from '@/components/review/snick-meter';
+import { onFieldFor, reasonFor } from '@/lib/drs/demo-service';
 import { analyzeDelivery, type DrsAnalysis } from '@/lib/drs/ai';
 import { saveReview } from '@/lib/drs/store';
 import { deleteClip, getClip, resolveClipUrl, type ReviewClip } from '@/lib/drs/clips';
-import { FootageCapture } from '@/components/review/footage-capture';
-import { FootagePlayer } from '@/components/review/footage-player';
+import { analyzeClipAudio, type ClipAudio } from '@/lib/drs/audio';
 import type { Decision, Review, ReviewEvidence, ReviewTypeId } from '@/lib/drs/types';
 import { cn } from '@/lib/utils';
 
@@ -44,32 +37,15 @@ const DrsScene = dynamic(
     loading: () => (
       <div className="flex aspect-[16/10] w-full items-center justify-center rounded-lg border border-white/10 bg-[#07120d]">
         <span className="font-mono text-[10px] uppercase tracking-widest text-white/40">
-          Loading 3D replay…
+          Loading tracking…
         </span>
       </div>
     ),
   },
 );
 
-const TOTAL_FRAMES = 300;
-const TOTAL_SECONDS = 6;
-const BASE_RATE = 1 / TOTAL_SECONDS;
-const CLAMP = (p: number) => Math.min(Math.max(p, 0), 1);
-
-/* Shared delivery timeline: release -> pitch -> impact (umpire-end view). */
-const RELEASE_T = 0.26;
-const BOUNCE_T = BALL_BOUNCE_T;
-const IMPACT_T = BALL_IMPACT_T;
-
-const SEGMENTS = [
-  { id: 'runup', label: 'Run-Up', from: 0, to: RELEASE_T },
-  { id: 'release', label: 'Release', from: RELEASE_T, to: BOUNCE_T },
-  { id: 'bounce', label: 'Bounce', from: BOUNCE_T, to: IMPACT_T },
-  { id: 'impact', label: 'Impact', from: IMPACT_T, to: 0.86 },
-  { id: 'post', label: 'Post Impact', from: 0.86, to: 1 },
-];
-
 const SPEEDS = [0.25, 0.5, 1, 2] as const;
+const FRAME_SEC = 1 / 30;
 
 function normalizeType(type: string): ReviewTypeId {
   const t = (type || 'lbw').toLowerCase().replace('run-out', 'runout');
@@ -104,131 +80,58 @@ const DEFAULT_DECISION: Record<ReviewTypeId, Decision> = {
   boundary: 'NOT OUT',
 };
 
+function deriveStatus(onField: Decision | 'SIX', decision: Decision): Review['status'] {
+  if (decision === 'INCONCLUSIVE') return 'INCONCLUSIVE';
+  return onField === 'OUT' === (decision === 'OUT') ? 'UPHELD' : 'OVERTURNED';
+}
+
 export function ReviewWorkstation({
   type,
-  ball = '16.4',
-  from = 'live',
-  matchId = 'demo-live',
-  matchLabel = 'Falcons vs Strikers · Hyderabad Turf League',
   clipId,
-  standalone = false,
+  from = 'upload',
 }: {
   type: string;
-  ball?: string;
+  clipId: string;
   from?: 'live' | 'history' | 'demo' | 'upload';
-  matchId?: string;
-  matchLabel?: string;
-  /** clip index key — present when reviewing a standalone uploaded video */
-  clipId?: string;
-  /** standalone mode: no match/ball bookkeeping, review lives on its own */
-  standalone?: boolean;
 }) {
   const router = useRouter();
   const reduceMotion = useReducedMotion();
 
   const [reviewType, setReviewType] = useState<ReviewTypeId>(() => normalizeType(type));
-  const [phase, setPhase] = useState<'capture' | 'analysis' | 'reveal'>('capture');
-  const [view, setView] = useState<'umpire' | 'top' | 'square'>('umpire');
   const [evidence, setEvidence] = useState<ReviewEvidence | null>(null);
   const [decision, setDecision] = useState<Decision>(DEFAULT_DECISION[normalizeType(type)]);
   const [returning, setReturning] = useState(false);
+  const [saveError, setSaveError] = useState<string | null>(null);
   const [analysis, setAnalysis] = useState<DrsAnalysis | null>(null);
   const [aiStatus, setAiStatus] = useState<'idle' | 'analyzing' | 'done'>('idle');
 
-  const [progress, setProgress] = useState(0);
-  const [playing, setPlaying] = useState(true);
+  const [playing, setPlaying] = useState(false);
   const [speed, setSpeed] = useState<number>(1);
+  const [currentTime, setCurrentTime] = useState(0);
+  const [duration, setDuration] = useState(0);
   const [zoom, setZoom] = useState(1);
-  const [overlays, setOverlays] = useState(false);
-  const [flash, setFlash] = useState<string | null>(null);
+  const [showTrajectory, setShowTrajectory] = useState(false);
   const [clip, setClip] = useState<ReviewClip | null>(null);
   const [clipSrc, setClipSrc] = useState('');
-  const [footageOpen, setFootageOpen] = useState(false);
+  const [audio, setAudio] = useState<ClipAudio | null>(null);
+  const [phase, setPhase] = useState<'review' | 'reveal'>('review');
 
-  const progressRef = useRef(0);
-  const autoRef = useRef(true);
-  const slowTriggeredRef = useRef(false);
-  const analysisPendingRef = useRef(false);
+  const videoRef = useRef<HTMLVideoElement | null>(null);
   const phaseRef = useRef(phase);
   phaseRef.current = phase;
+  const playRef = useRef<() => void>(() => {});
+  const stepRef = useRef<(dir: number) => void>(() => {});
 
   const label = reviewLabel(reviewType);
-  const frame = Math.round(progress * (TOTAL_FRAMES - 1));
-  const timestamp = formatTime(progress * TOTAL_SECONDS);
-  const isLbw = reviewType === 'lbw';
-  const isCaught = reviewType === 'caught';
+  const frame = duration > 0 ? Math.floor(currentTime * 30) : 0;
+  const totalFrames = duration > 0 ? Math.floor(duration * 30) : 0;
 
-  const isStandalone = standalone && Boolean(clipId);
-  const clipKey = isStandalone ? (clipId as string) : ball;
-  const evidenceMatchId = isStandalone ? 'standalone' : matchId;
-
-  /* Load evidence: AI analysis of the clip when it lives in the storage bucket,
-     simulated evidence otherwise. Never blocks the review either way. */
+  /* Load clip from localStorage index */
   useEffect(() => {
-    let active = true;
-    async function load() {
-      setAiStatus('analyzing');
-      try {
-        let result: DrsAnalysis | null = null;
-        if (clip?.path && matchId) {
-          try {
-            result = await analyzeDelivery({
-              matchId: evidenceMatchId,
-              ballId: clipKey,
-              type: reviewType,
-              clipPath: clip.path,
-            });
-          } catch {
-            result = null;
-          }
-        }
-        if (!active) return;
-        if (result) {
-          setAnalysis(result);
-          setEvidence(result.evidence);
-        } else {
-          setAnalysis(null);
-          const ev = await demoService.requestEvidence({
-            matchId: evidenceMatchId,
-            ballId: clipKey,
-            type: reviewType,
-          });
-          if (active) setEvidence(ev);
-        }
-      } finally {
-        if (active) setAiStatus('done');
-      }
-    }
-    void load();
-    return () => {
-      active = false;
-    };
-  }, [reviewType, ball, matchId, clipKey, evidenceMatchId, clip?.path]);
-
-  /* Standalone: picking another review type resets the replay cleanly. */
-  useEffect(() => {
-    if (!isStandalone) return;
-    slowTriggeredRef.current = false;
-    autoRef.current = true;
-    analysisPendingRef.current = false;
-    setDecision(DEFAULT_DECISION[reviewType]);
-    setPhase('capture');
-    setView('umpire');
-    setOverlays(false);
-    setZoom(1);
-    setSpeed(1);
-    progressRef.current = 0;
-    setProgress(0);
-    setPlaying(true);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isStandalone, reviewType]);
-
-  /* Phone footage clip for this ball/clip — read from the local index + listen for changes */
-  useEffect(() => {
-    setClip(getClip(clipKey));
-    const onChange = () => setClip(getClip(clipKey));
+    setClip(getClip(clipId));
+    const onChange = () => setClip(getClip(clipId));
     const onDetach = () => {
-      deleteClip(clipKey);
+      deleteClip(clipId);
       setClip(null);
     };
     window.addEventListener('turf-drs:clips-changed', onChange);
@@ -237,9 +140,9 @@ export function ReviewWorkstation({
       window.removeEventListener('turf-drs:clips-changed', onChange);
       window.removeEventListener('turf-drs:clip-detached', onDetach);
     };
-  }, [clipKey]);
+  }, [clipId]);
 
-  /* Resolve a playable URL for the private bucket (re-signs once expired). */
+  /* Resolve playable URL */
   useEffect(() => {
     let active = true;
     if (!clip) {
@@ -254,191 +157,163 @@ export function ReviewWorkstation({
     };
   }, [clip]);
 
-  const flashFor = useCallback((text: string, ms = 1100) => {
-    setFlash(text);
-    window.setTimeout(() => setFlash(null), ms);
+  /* Sync real <video> element events */
+  const onLoadedMetadata = useCallback(() => {
+    const v = videoRef.current;
+    if (!v) return;
+    setDuration(v.duration);
+    setCurrentTime(v.currentTime);
   }, []);
 
-  const enterAnalysis = useCallback(
-    (t: ReviewTypeId) => {
-      if (phaseRef.current !== 'capture') return;
-      analysisPendingRef.current = false;
-      setPhase('analysis');
-      if (t === 'caught') flashFor('CONTACT DETECTED', 1500);
-      else if (t === 'boundary') flashFor('BOUNDARY CHECK', 1500);
-      else flashFor('IMPACT · 0.73s', 1500);
-    },
-    [flashFor],
-  );
+  const onTimeUpdate = useCallback(() => {
+    const v = videoRef.current;
+    if (!v) return;
+    setCurrentTime(v.currentTime);
+  }, []);
 
-  /* Ball auto-capture loop — plays the delivery, freezes on impact, moves to analysis */
-  useEffect(() => {
-    if (!playing) return;
-    let raf = 0;
-    let last = performance.now();
-    const tick = (now: number) => {
-      const dt = Math.min((now - last) / 1000, 0.06);
-      last = now;
-      const next = Math.min(progressRef.current + dt * BASE_RATE * speed, 1);
-
-      if (autoRef.current && !slowTriggeredRef.current && next >= 0.5) {
-        slowTriggeredRef.current = true;
-        setSpeed(0.25);
-        flashFor('SLOW MOTION');
-      }
-
-      /* LBW runs through to the stumps so the ball connects and the wicket
-         breaks; other types freeze on the contact frame. */
-      const freezeAt = isLbw ? 1 : IMPACT_T;
-      if (autoRef.current && next >= freezeAt) {
-        progressRef.current = freezeAt;
-        setProgress(freezeAt);
-        setPlaying(false);
-        setOverlays(true);
-        setZoom(isCaught ? 2.3 : 2);
-        enterAnalysis(reviewType);
-        return;
-      }
-
-      if (next >= 1) {
-        progressRef.current = 1;
-        setProgress(1);
-        setPlaying(false);
-        return;
-      }
-
-      progressRef.current = next;
-      setProgress(next);
-      raf = requestAnimationFrame(tick);
-    };
-    raf = requestAnimationFrame(tick);
-    return () => cancelAnimationFrame(raf);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [playing, speed, flashFor, isCaught, enterAnalysis, reviewType]);
-
-  /* Phase scheduling: LBW crossfades camera -> top-down pitch, then all go to reveal */
-  useEffect(() => {
-    if (phase !== 'analysis') return;
-    const timers: number[] = [];
-
-    if (isLbw) {
-      timers.push(
-        window.setTimeout(() => {
-          setView('top');
-          setZoom(1);
-          flashFor('TOP VIEW · IN LINE CHECK', 1400);
-        }, 1300),
-        window.setTimeout(() => setPhase('reveal'), 9200),
-      );
-    } else {
-      timers.push(window.setTimeout(() => setPhase('reveal'), 6500));
-    }
-
-    return () => timers.forEach((id) => window.clearTimeout(id));
-  }, [phase, isLbw, flashFor]);
-
-  const scheduleAnalysis = useCallback(
-    (t: ReviewTypeId) => {
-      if (analysisPendingRef.current) return;
-      analysisPendingRef.current = true;
-      window.setTimeout(() => enterAnalysis(t), 700);
-    },
-    [enterAnalysis],
-  );
-
-  const play = () => {
-    if (phaseRef.current !== 'capture') {
-      setPlaying(false);
-      return;
-    }
-    if (playing) {
-      setPlaying(false);
-      return;
-    }
-    if (autoRef.current && progressRef.current < IMPACT_T) {
-      setPlaying(true);
-      return;
-    }
-    /* Manual replay of the full sequence */
-    autoRef.current = false;
-    setOverlays(false);
-    setPlaying(true);
-  };
-
-  const replay = () => {
-    autoRef.current = true;
-    slowTriggeredRef.current = false;
-    analysisPendingRef.current = false;
-    setPhase('capture');
-    setView('umpire');
-    setOverlays(false);
-    setZoom(1);
-    setSpeed(1);
-    progressRef.current = 0;
-    setProgress(0);
-    setPlaying(true);
-  };
-
-  const stepFrame = (dir: number) => {
-    autoRef.current = false;
+  const onEnded = useCallback(() => {
     setPlaying(false);
-    const next = CLAMP(progressRef.current + dir / (TOTAL_FRAMES - 1));
-    if (next >= IMPACT_T) {
-      setOverlays(true);
-      if (phaseRef.current === 'capture') scheduleAnalysis(reviewType);
-    }
-    progressRef.current = next;
-    setProgress(next);
-  };
+  }, []);
 
-  const changeSpeed = (value: number) => {
-    autoRef.current = false;
-    slowTriggeredRef.current = true;
+  /* Playback rate */
+  useEffect(() => {
+    const v = videoRef.current;
+    if (v) v.playbackRate = speed;
+  }, [speed, clipSrc]);
+
+  /* Decode audio from the real clip */
+  useEffect(() => {
+    let active = true;
+    if (!clipSrc) {
+      setAudio(null);
+      return;
+    }
+    analyzeClipAudio(clipSrc).then((result) => {
+      if (active) setAudio(result);
+    });
+    return () => {
+      active = false;
+    };
+  }, [clipSrc]);
+
+  /* AI analysis: run when type changes or clip is first loaded. If AI is
+     unavailable we show an honest "watch the clip" state — never simulated
+     findings dressed up as real evidence. */
+  useEffect(() => {
+    let active = true;
+    async function load() {
+      setAiStatus('analyzing');
+      try {
+        if (clip?.path) {
+          const result = await analyzeDelivery({
+            matchId: 'standalone',
+            ballId: clipId,
+            type: reviewType,
+            clipPath: clip.path,
+          });
+          if (active) {
+            setAnalysis(result);
+            setEvidence(result.evidence);
+          }
+        }
+      } catch {
+        /* AI unavailable — analysis stays null, UI shows the honest state */
+      } finally {
+        if (active) setAiStatus('done');
+      }
+    }
+    void load();
+    return () => {
+      active = false;
+    };
+  }, [reviewType, clipId, clip?.path]);
+
+  /* Review type change — reset decision + trajectory */
+  useEffect(() => {
+    setDecision(DEFAULT_DECISION[reviewType]);
+    setShowTrajectory(false);
+  }, [reviewType]);
+
+  /* Transport controls */
+  const play = useCallback(() => {
+    const v = videoRef.current;
+    if (!v) return;
+    if (v.paused) {
+      v.play().catch(() => {
+        /* autoplay blocked — rely on click */
+      });
+      setPlaying(true);
+    } else {
+      v.pause();
+      setPlaying(false);
+    }
+  }, []);
+  playRef.current = play;
+
+  const replay = useCallback(() => {
+    const v = videoRef.current;
+    if (!v) return;
+    v.currentTime = 0;
+    setCurrentTime(0);
+    v.play().catch(() => {});
+    setPlaying(true);
+  }, []);
+
+  const stepFrame = useCallback(
+    (dir: number) => {
+      const v = videoRef.current;
+      if (!v) return;
+      v.pause();
+      setPlaying(false);
+      v.currentTime = Math.max(0, Math.min(duration, v.currentTime + dir * FRAME_SEC));
+    },
+    [duration],
+  );
+  stepRef.current = stepFrame;
+
+  const changeSpeed = useCallback((value: number) => {
     setSpeed(value);
-  };
+  }, []);
 
-  const seekTo = (target: number) => {
-    autoRef.current = false;
-    slowTriggeredRef.current = true;
-    const next = CLAMP(target);
-    if (next >= IMPACT_T) {
-      setOverlays(true);
-      if (phaseRef.current === 'capture') scheduleAnalysis(reviewType);
-    }
-    progressRef.current = next;
-    setProgress(next);
-  };
-
-  const seekFromPointer = (event: React.PointerEvent<HTMLDivElement>) => {
-    const rect = event.currentTarget.getBoundingClientRect();
-    seekTo(CLAMP((event.clientX - rect.left) / rect.width));
-  };
-
-  const adjustZoom = (dir: number) => setZoom((value) => Math.min(Math.max(value + dir, 1), 3));
+  const seekFromPointer = useCallback(
+    (event: React.PointerEvent<HTMLDivElement>) => {
+      const rect = event.currentTarget.getBoundingClientRect();
+      const progress = Math.min(1, Math.max(0, (event.clientX - rect.left) / rect.width));
+      const v = videoRef.current;
+      if (!v || !duration) return;
+      v.currentTime = progress * duration;
+      setCurrentTime(v.currentTime);
+    },
+    [duration],
+  );
 
   /* Keyboard */
   useEffect(() => {
     const onKey = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        if (phaseRef.current === 'reveal') {
+          setPhase('review');
+          setSaveError(null);
+        } else {
+          handleExit();
+        }
+        return;
+      }
+      if (phaseRef.current === 'reveal') {
+        if (event.key === '1') setDecision('OUT');
+        else if (event.key === '2') setDecision('NOT OUT');
+        else if (event.key === '3') setDecision('INCONCLUSIVE');
+        return;
+      }
       if (event.key === ' ') {
         event.preventDefault();
-        if (phaseRef.current === 'reveal') return;
-        setPlaying((value) => !value);
+        playRef.current();
       } else if (event.key === 'ArrowLeft') {
         event.preventDefault();
-        if (phaseRef.current === 'reveal') return;
-        const next = CLAMP(progressRef.current - 1 / (TOTAL_FRAMES - 1));
-        progressRef.current = next;
-        setProgress(next);
-        setOverlays(next >= IMPACT_T);
+        stepRef.current(-1);
       } else if (event.key === 'ArrowRight') {
         event.preventDefault();
-        if (phaseRef.current === 'reveal') return;
-        const next = CLAMP(progressRef.current + 1 / (TOTAL_FRAMES - 1));
-        progressRef.current = next;
-        setProgress(next);
-        setOverlays(next >= IMPACT_T);
-      } else if (event.key === 'Escape') {
-        handleExit();
+        stepRef.current(1);
       }
     };
     window.addEventListener('keydown', onKey);
@@ -446,7 +321,7 @@ export function ReviewWorkstation({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  /* Lock scroll while open */
+  /* Lock scroll */
   useEffect(() => {
     const previous = document.body.style.overflow;
     document.body.style.overflow = 'hidden';
@@ -456,88 +331,49 @@ export function ReviewWorkstation({
   }, []);
 
   const handleExit = () => {
-    if (from === 'history') router.replace('/reviews');
-    else if (isStandalone) router.replace('/review');
-    else router.replace('/live');
+    router.replace(from === 'history' ? '/reviews' : from === 'live' ? '/live' : '/review');
   };
 
   const handleReturn = async () => {
     if (returning) return;
     setReturning(true);
-    let review: Review | null = null;
+    setSaveError(null);
     try {
-      review = await demoService.finalizeReview({
-        matchId: evidenceMatchId,
-        ballId: clipKey,
+      const onField = onFieldFor(reviewType);
+      const review: Review = {
+        id: typeof crypto !== 'undefined' && 'randomUUID' in crypto ? crypto.randomUUID() : `rv-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+        matchId: 'standalone',
+        matchLabel: 'Standalone review',
+        ballId: clipId,
         type: reviewType,
+        onField,
         decision,
-        onField: onFieldFor(reviewType),
-      });
-      review = {
-        ...review,
-        matchLabel,
+        status: deriveStatus(onField, decision),
+        reason: analysis?.analyzedBy === 'ai' && analysis.reason ? analysis.reason : reasonFor(reviewType, decision),
+        createdAt: Date.now(),
         clipPath: clip?.path,
         clipUrl: clip?.url,
       };
       await saveReview(review);
-    } catch {
-      /* still navigate so the user is never stranded */
-    }
-    if (from === 'history') router.replace('/reviews');
-    else if (isStandalone) router.replace('/review');
-    else if (review) {
-      router.replace(`/live?review=${decision}&status=${review.status}&ball=${ball}`);
-    } else {
-      router.replace('/live');
+      router.replace(from === 'history' ? '/reviews' : from === 'live' ? '/live' : '/review');
+    } catch (err) {
+      setSaveError(err instanceof Error ? err.message : 'Save failed — please try again.');
+      setReturning(false);
     }
   };
 
-  const playheadStyle = { left: `${progress * 100}%` };
+  const playheadPercent = duration > 0 ? (currentTime / duration) * 100 : 0;
+  const contactMs =
+    analysis?.analyzedBy === 'ai' && evidence?.contactFrame != null
+      ? evidence.contactFrame * 33.33
+      : audio?.peakAtMs ?? null;
+
   const verdictNote =
     decision === 'INCONCLUSIVE'
       ? 'Insufficient evidence'
       : decision === 'OUT'
         ? 'Decision: OUT'
         : 'Decision: NOT OUT';
-
-  const scope = phase === 'reveal' ? 'reveal' : phase === 'analysis' ? 'analysis' : 'capture';
-
-  /* Uploadable phone footage — record from the umpire end or attach a saved clip */
-  const footagePanel = (
-    <div className="space-y-2">
-      {clip ? (
-        <>
-          {clipSrc ? (
-            <FootagePlayer src={clipSrc} title={`Ball ${ball}`} />
-          ) : (
-            <div className="flex aspect-video w-full items-center justify-center rounded-lg border border-white/10 bg-black">
-              <span className="font-mono text-[10px] uppercase tracking-widest text-white/40">
-                Loading clip…
-              </span>
-            </div>
-          )}
-          <p className="text-[10px] leading-relaxed text-white/45">
-            {clip.url.startsWith('blob:')
-              ? 'Saved on this device. No storage bucket yet — set up drs-clips to keep it in the cloud.'
-              : 'Uploaded to the drs-clips bucket (private, signed URL).'}
-          </p>
-          <button
-            type="button"
-            onClick={() => {
-              deleteClip(ball);
-              setClip(null);
-            }}
-            className="inline-flex h-8 items-center gap-1.5 rounded-lg border border-white/10 px-2.5 text-xs font-medium text-white/60 transition-colors hover:text-rose-300"
-          >
-            <RotateCcw className="h-3.5 w-3.5" />
-            Re-record
-          </button>
-        </>
-      ) : (
-        <FootageCapture ballId={ball} matchId={matchId} initial={null} onClip={setClip} />
-      )}
-    </div>
-  );
 
   return (
     <motion.div
@@ -565,20 +401,12 @@ export function ReviewWorkstation({
           <p className="truncate font-mono text-[11px] font-semibold uppercase tracking-[0.18em] text-amber-300 sm:text-xs">
             Third Umpire Review
             <span className="mx-2 text-white/25">•</span>
-            <span className="text-white/80">{isStandalone ? 'Standalone review' : 'Falcons vs Strikers'}</span>
-            <span className="mx-2 text-white/25">•</span>
-            <span className="text-cyan-300">{isStandalone ? 'UPLOADED CLIP' : ball}</span>
-            <span className="mx-2 text-white/25">•</span>
             <span className="text-white/80">{label}</span>
           </p>
         </div>
         <div className="flex items-center gap-2">
-          <span className="hidden items-center gap-1.5 rounded-full bg-rose-500/10 px-2.5 py-1 font-mono text-[10px] font-semibold uppercase tracking-widest text-rose-300 ring-1 ring-rose-500/25 sm:flex">
-            <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-rose-500" />
-            REC
-          </span>
           <span className="hidden font-mono text-[10px] font-medium uppercase tracking-widest text-white/40 md:block">
-            {view === 'top' ? 'CV · Top View' : 'Cam 01 · Umpire End'}
+            {clip?.name ?? clipId}
           </span>
           <button
             type="button"
@@ -591,382 +419,499 @@ export function ReviewWorkstation({
         </div>
       </header>
 
-      {/* Central area */}
-      <main className="relative min-h-0 flex-1">
-        {/* HUD corner brackets */}
-        {phase !== 'reveal' && (
+      {/* Decision reveal overlay */}
+      {phase === 'reveal' ? (
+        <div className="relative flex flex-1 flex-col items-center justify-center bg-[#03050a]/95 px-4">
+          {/* Broadcast scan sweep */}
+          <div aria-hidden="true" className="pointer-events-none absolute inset-0 overflow-hidden rounded-3xl">
+            <motion.div
+              initial={{ y: '-10%' }}
+              animate={{ y: '110%' }}
+              transition={{ duration: 2.2, ease: 'easeInOut', repeat: Infinity, repeatDelay: 0.6 }}
+              className="absolute inset-x-0 top-0 h-16 bg-gradient-to-b from-transparent via-emerald-400/10 to-transparent blur-md"
+            />
+          </div>
+
+          <div className="relative z-30 flex w-full max-w-2xl flex-1 flex-col items-center justify-center py-8 text-center">
+            <AnimatePresence mode="wait">
+              <motion.div
+                key={`reveal-${decision}`}
+                initial={reduceMotion ? false : { opacity: 0, scale: 0.72 }}
+                animate={{ opacity: 1, scale: 1 }}
+                exit={reduceMotion ? undefined : { opacity: 0, scale: 0.96 }}
+                transition={{ duration: 0.45, ease: 'easeOut' }}
+                className="relative flex w-full flex-1 flex-col items-center justify-center text-center"
+              >
+                <motion.span
+                  initial={reduceMotion ? false : { letterSpacing: '0.6em', opacity: 0 }}
+                  animate={{ letterSpacing: '0.26em', opacity: 1 }}
+                  transition={{ duration: 0.55 }}
+                  className="font-mono text-xs font-bold uppercase text-white/70 sm:text-base"
+                >
+                  {label}
+                </motion.span>
+
+                <motion.div
+                  key={decision}
+                  initial={reduceMotion ? false : { opacity: 0, scale: 0.4, filter: 'blur(10px)' }}
+                  animate={{ opacity: 1, scale: 1, filter: 'blur(0px)' }}
+                  transition={{ delay: 0.25, type: 'spring', stiffness: 190, damping: 15 }}
+                  className="relative mt-5 sm:mt-7"
+                  style={{
+                    textShadow: decision === 'OUT'
+                      ? '0 0 42px #fb718577, 0 0 96px #fb718544'
+                      : decision === 'NOT OUT'
+                        ? '0 0 42px #34d39977, 0 0 96px #34d39944'
+                        : '0 0 42px #fbbf2477, 0 0 96px #fbbf2444',
+                  }}
+                >
+                  <motion.div
+                    animate={{ opacity: [0.25, 0.7, 0.25] }}
+                    transition={{ duration: 2.4, repeat: Infinity, ease: 'easeInOut' }}
+                    className="absolute -inset-6 rounded-full"
+                    style={{
+                      background: `radial-gradient(circle, ${decision === 'OUT' ? '#fb718526' : decision === 'NOT OUT' ? '#34d39926' : '#fbbf2426'} 0%, transparent 70%)`,
+                      filter: 'blur(10px)',
+                    }}
+                  />
+                  <span
+                    className="relative inline-block rounded-2xl border px-7 py-3 font-mono text-5xl font-black uppercase tracking-[0.12em] sm:px-10 sm:py-4 sm:text-7xl"
+                    style={{
+                      borderColor: decision === 'OUT' ? '#fb718566' : decision === 'NOT OUT' ? '#34d39966' : '#fbbf2466',
+                      background: `linear-gradient(180deg, ${decision === 'OUT' ? '#fb71851a' : decision === 'NOT OUT' ? '#34d3991a' : '#fbbf241a'}, ${decision === 'OUT' ? '#fb718505' : decision === 'NOT OUT' ? '#34d39905' : '#fbbf2405'})`,
+                      color: decision === 'OUT' ? '#fb7185' : decision === 'NOT OUT' ? '#34d399' : '#fbbf24',
+                      boxShadow: `0 0 60px ${decision === 'OUT' ? '#fb718533' : decision === 'NOT OUT' ? '#34d39933' : '#fbbf2433'}`,
+                    }}
+                    aria-live="polite"
+                  >
+                    {decision}
+                  </span>
+                  <p className="mt-3 font-mono text-[9px] uppercase tracking-[0.3em] text-white/40">
+                    {analysis?.analyzedBy === 'ai' && analysis.reason ? analysis.reason : reasonFor(reviewType, decision)}
+                  </p>
+                </motion.div>
+              </motion.div>
+            </AnimatePresence>
+
+            {/* Reveal controls */}
+            <motion.div
+              initial={reduceMotion ? false : { opacity: 0, y: 18 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.85, duration: 0.4 }}
+              className="relative mt-8 w-full"
+            >
+              <div className="mx-auto flex max-w-md flex-col gap-3 sm:flex-row sm:justify-center">
+                <button
+                  type="button"
+                  onClick={() => { setPhase('review'); setSaveError(null); }}
+                  disabled={returning}
+                  className="inline-flex h-12 flex-1 items-center justify-center gap-2 rounded-xl border border-white/15 bg-white/[0.03] px-6 text-sm font-semibold text-white/80 transition-all hover:border-amber-400/40 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/60 disabled:opacity-60"
+                >
+                  <RotateCcw className="h-4 w-4" />
+                  Back to Review
+                </button>
+                <button
+                  type="button"
+                  onClick={handleReturn}
+                  disabled={returning}
+                  className="inline-flex h-12 flex-1 items-center justify-center gap-2 rounded-xl bg-teal-500 px-6 text-sm font-semibold text-white shadow-lg shadow-teal-500/25 transition-all hover:bg-teal-400 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/60 disabled:opacity-60"
+                >
+                  {returning ? (
+                    <RotateCcw className="h-4 w-4 animate-spin" />
+                  ) : (
+                    <ArrowRight className="h-4 w-4" />
+                  )}
+                  {returning ? 'Saving…' : 'Save Decision & Exit'}
+                </button>
+              </div>
+              {saveError && (
+                <p className="mt-3 text-center text-xs text-rose-300">{saveError}</p>
+              )}
+              <p className="mt-4 flex items-center justify-center gap-1.5 text-center text-[10px] text-white/35">
+                <ShieldAlert className="h-3 w-3" />
+                Decision logged to your review history.
+              </p>
+            </motion.div>
+          </div>
+        </div>
+      ) : (
+        /* ── Review mode: real video + evidence sidebar ── */
+        <div className="relative min-h-0 flex-1 lg:grid lg:grid-cols-[minmax(0,1fr)_340px]">
+          {/* HUD corner brackets */}
           <div aria-hidden="true" className="pointer-events-none absolute inset-4 z-10 hidden sm:block">
             <span className="absolute left-0 top-0 h-5 w-5 border-l-2 border-t-2 border-amber-400/30" />
             <span className="absolute right-0 top-0 h-5 w-5 border-r-2 border-t-2 border-amber-400/30" />
             <span className="absolute bottom-0 left-0 h-5 w-5 border-b-2 border-l-2 border-amber-400/30" />
             <span className="absolute bottom-0 right-0 h-5 w-5 border-b-2 border-r-2 border-amber-400/30" />
           </div>
-        )}
 
-        {phase === 'reveal' ? (
-          <div className="absolute inset-0 flex items-center justify-center bg-[#03050a]/95 px-4">
-            <div className="w-full max-w-2xl">
-              <DecisionReveal
-                type={reviewType}
-                decision={decision}
-                onDecision={setDecision}
-                onReturn={handleReturn}
-                onReset={replay}
-                returning={returning}
-                matchLabel={matchLabel}
-                ball={ball}
-              />
+          {/* Video area */}
+          <div className="relative min-h-0 overflow-hidden">
+            {/* Real video */}
+            <div
+              className="absolute inset-0 flex items-center justify-center"
+              style={{
+                transform: `scale(${zoom})`,
+                transformOrigin: '49.5% 41.5%',
+                transition: reduceMotion ? 'none' : 'transform 0.5s ease-out',
+              }}
+            >
+              {clipSrc ? (
+                <video
+                  ref={videoRef}
+                  src={clipSrc}
+                  onLoadedMetadata={onLoadedMetadata}
+                  onTimeUpdate={onTimeUpdate}
+                  onEnded={onEnded}
+                  playsInline
+                  className="max-h-full max-w-full object-contain"
+                />
+              ) : (
+                <div className="flex aspect-video w-full items-center justify-center bg-[#07120d]">
+                  <span className="font-mono text-[10px] uppercase tracking-widest text-white/40">
+                    Loading clip…
+                  </span>
+                </div>
+              )}
+            </div>
+
+            {/* AI trajectory overlay — drawn on top of the real video. Only ever
+              rendered from AI-measured trajectory data; never canned. */}
+            {analysis?.analyzedBy === 'ai' && showTrajectory && evidence?.trajectory && evidence.trajectory.length >= 2 && (
+              <svg
+                viewBox="0 0 1 1"
+                preserveAspectRatio="none"
+                className="pointer-events-none absolute inset-0 z-20 h-full w-full"
+                aria-hidden="true"
+              >
+                <polyline
+                  points={evidence.trajectory.map((p) => `${p.x / 400},${p.y / 300}`).join(' ')}
+                  fill="none"
+                  stroke="rgba(251,191,36,0.8)"
+                  strokeWidth="0.004"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                />
+                {evidence.impact && (
+                  <circle
+                    cx={evidence.impact.x / 400}
+                    cy={evidence.impact.y / 300}
+                    r="0.012"
+                    fill="rgba(251,191,36,0.9)"
+                  />
+                )}
+                {/* Projected path to stumps (dashed continuation) */}
+                {evidence.hitStumps && evidence.impact && (
+                  <line
+                    x1={evidence.impact.x / 400}
+                    y1={evidence.impact.y / 300}
+                    x2={evidence.impact.x / 400 - 0.04}
+                    y2={0.82}
+                    stroke="rgba(251,191,36,0.5)"
+                    strokeWidth="0.003"
+                    strokeDasharray="0.006 0.004"
+                  />
+                )}
+              </svg>
+            )}
+
+            {/* Contact frame marker badge */}
+            {evidence?.contactFrame != null && currentTime > 0 && (
+              <div className="pointer-events-none absolute left-1/2 top-3 z-20 -translate-x-1/2 rounded-full border border-emerald-400/30 bg-black/70 px-4 py-1.5 font-mono text-[10px] font-semibold uppercase tracking-[0.22em] text-emerald-300 backdrop-blur-sm">
+                {reviewType === 'caught'
+                  ? `CONTACT · FRAME ${evidence.contactFrame}`
+                  : `IMPACT · FRAME ${evidence.contactFrame}`}
+              </div>
+            )}
+
+            {/* Zoom controls */}
+            <div className="absolute bottom-4 left-4 z-20 flex items-center gap-1 rounded-full border border-white/10 bg-black/70 p-1 backdrop-blur-sm">
+              <button
+                type="button"
+                onClick={() => setZoom((v) => Math.max(1, v - 0.25))}
+                aria-label="Zoom out"
+                className="flex h-8 w-8 items-center justify-center rounded-full text-white/60 transition-colors hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/60"
+              >
+                <ZoomOut className="h-3.5 w-3.5" />
+              </button>
+              <span className="w-10 text-center font-mono text-[10px] font-semibold text-amber-300">
+                {zoom.toFixed(1)}x
+              </span>
+              <button
+                type="button"
+                onClick={() => setZoom((v) => Math.min(3, v + 0.25))}
+                aria-label="Zoom in"
+                className="flex h-8 w-8 items-center justify-center rounded-full text-white/60 transition-colors hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/60"
+              >
+                <ZoomIn className="h-3.5 w-3.5" />
+              </button>
+            </div>
+
+            {/* Footage badge */}
+            <div className="pointer-events-none absolute right-3 top-3 z-20 flex items-center gap-2 rounded-lg bg-black/70 px-2.5 py-1.5 font-mono text-[10px] font-semibold uppercase tracking-widest text-white/60 backdrop-blur-sm">
+              <Video className="h-3.5 w-3.5" />
+              {clip?.name ?? 'Clip'}
             </div>
           </div>
-        ) : (
-          <div className="relative grid h-full min-h-0 lg:grid-cols-[minmax(0,1fr)_320px]">
-            {/* Video / scene */}
-            <div className="relative min-h-0 overflow-hidden">
-              <div
-                className="absolute inset-0 flex items-center justify-center"
-                style={{
-                  transform: `scale(${zoom})`,
-                  transformOrigin: '49.5% 41.5%',
-                  transition: reduceMotion ? 'none' : 'transform 0.5s ease-out',
-                }}
-              >
-                <div className="w-full max-w-5xl px-4">
-                  <DrsScene
-                    type={reviewType}
-                    progress={progress}
-                    view={view}
-                    overlays={overlays}
-                    zoom={zoom}
-                  />
-                </div>
+
+          {/* Evidence sidebar — desktop */}
+          <aside aria-label="Review evidence" className="hidden shrink-0 flex-col border-l border-white/10 bg-[#0a0e16]/80 lg:flex">
+            <div className="space-y-4 overflow-y-auto p-5">
+              {/* Header + AI badge */}
+              <div>
+                <p className="flex items-center gap-1.5 font-mono text-[10px] font-semibold uppercase tracking-[0.24em] text-white/45">
+                  <Scale className="h-3 w-3" />
+                  Frame Analysis
+                </p>
+                <h3 className="mt-1.5 text-base font-semibold tracking-tight text-foreground">{label}</h3>
+                {aiStatus === 'analyzing' && (
+                  <span className="mt-1.5 inline-flex items-center gap-1.5 rounded-full bg-amber-400/10 px-2.5 py-1 font-mono text-[9px] font-semibold uppercase tracking-widest text-amber-300 ring-1 ring-amber-400/25">
+                    <Loader2 className="h-3 w-3 animate-spin" />
+                    Analyzing clip…
+                  </span>
+                )}
+                {aiStatus === 'done' && analysis?.analyzedBy === 'ai' && (
+                  <span className="mt-1.5 inline-flex items-center gap-1.5 rounded-full bg-emerald-400/10 px-2.5 py-1 font-mono text-[9px] font-semibold uppercase tracking-widest text-emerald-300 ring-1 ring-emerald-400/25">
+                    <Sparkles className="h-3 w-3" />
+                    AI · {(analysis.model ?? 'gemini').replace(/^gemini-/, '').split('-').join(' ')}
+                  </span>
+                )}
+                {aiStatus === 'done' && analysis?.analyzedBy !== 'ai' && (
+                  <span className="mt-1.5 inline-flex items-center gap-1.5 rounded-full bg-white/[0.06] px-2.5 py-1 font-mono text-[9px] font-semibold uppercase tracking-widest text-white/50 ring-1 ring-white/15">
+                    <AlertTriangle className="h-3 w-3" />
+                    AI unavailable
+                  </span>
+                )}
               </div>
 
-              {/* Caught — audio analysis overlay */}
-              {isCaught && phase === 'analysis' && evidence && (
-                <div className="absolute right-3 top-3 z-20 w-56 sm:w-64 lg:right-4">
-                  <SnickAudio data={evidence.audio} playing={false} highlighted={evidence.contactConfirmed} />
-                </div>
-              )}
-
-              {isCaught && phase === 'analysis' && (
-                <div className="absolute left-1/2 top-3 z-20 -translate-x-1/2 rounded-full border border-emerald-400/30 bg-black/70 px-4 py-1.5 font-mono text-[10px] font-semibold uppercase tracking-[0.22em] text-emerald-300 backdrop-blur-sm">
-                  {evidence?.contactFrame ? `CONTACT · FRAME ${evidence.contactFrame}` : 'CONTACT · FRAME 241'}
-                </div>
-              )}
-
-              {/* DRS camera switcher — always available */}
-              <div className="absolute bottom-4 left-4 z-20 flex items-center gap-1 rounded-full border border-white/10 bg-black/70 p-1 backdrop-blur-sm">
-                  {(
-                    [
-                      ['umpire', 'Umpire'],
-                      ['top', 'Top'],
-                      ['square', 'Square'],
-                    ] as const
-                  ).map(([cam, label]) => (
+              {/* Review type chips */}
+              <div>
+                <p className="font-mono text-[10px] font-semibold uppercase tracking-[0.24em] text-white/45">
+                  Review type
+                </p>
+                <div className="mt-2 flex flex-wrap gap-1.5">
+                  {(['lbw', 'caught', 'runout', 'stumping', 'boundary'] as ReviewTypeId[]).map((t) => (
                     <button
-                      key={cam}
+                      key={t}
                       type="button"
-                      onClick={() => {
-                        setView(cam);
-                        setZoom(cam === 'top' ? 1 : cam === 'umpire' ? 2.2 : 1.2);
-                      }}
-                      aria-pressed={view === cam}
+                      onClick={() => setReviewType(t)}
+                      aria-pressed={reviewType === t}
                       className={cn(
-                        'rounded-full px-3 py-1 font-mono text-[10px] font-semibold uppercase tracking-[0.18em] transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/60',
-                        view === cam
-                          ? 'bg-amber-400/20 text-amber-300 ring-1 ring-amber-400/40'
-                          : 'text-white/50 hover:text-white',
+                        'rounded-full border px-2.5 py-1 font-mono text-[10px] font-semibold uppercase tracking-widest transition-colors',
+                        reviewType === t
+                          ? 'border-amber-400/40 bg-amber-400/15 text-amber-300'
+                          : 'border-white/10 text-white/50 hover:text-white',
                       )}
                     >
-                      {label}
+                      {t === 'runout' ? 'Run Out' : t}
                     </button>
                   ))}
                 </div>
-            </div>
+              </div>
 
-            {/* Footage drawer — all breakpoints */}
-            <div>
-              <button
-                type="button"
-                onClick={() => setFootageOpen((value) => !value)}
-                className={cn(
-                  'absolute bottom-4 right-4 z-30 inline-flex h-10 items-center gap-2 rounded-full border px-4 font-mono text-[10px] font-semibold uppercase tracking-[0.18em] backdrop-blur-sm transition-colors',
-                  footageOpen
-                    ? 'border-amber-400/40 bg-amber-400/15 text-amber-300'
-                    : 'border-white/10 bg-black/70 text-white/70 hover:text-white',
-                )}
-              >
-                <Video className="h-3.5 w-3.5" />
-                Footage
-              </button>
-              {footageOpen && (
-                <div className="absolute inset-x-0 bottom-0 z-30 max-h-[60%] overflow-y-auto border-t border-white/10 bg-[#0a0e16]/95 p-4 backdrop-blur-md">
-                  <div className="mb-2 flex items-center justify-between">
-                    <span className="font-mono text-[10px] font-semibold uppercase tracking-[0.24em] text-white/45">
-                      Phone footage
+              {/* Findings — only when AI analyzed; otherwise honest "watch the video" */}
+              <div className="space-y-2">
+                {aiStatus === 'analyzing' && (
+                  <div className="flex items-center gap-2 rounded-xl border border-amber-400/20 bg-amber-400/[0.05] px-3 py-2.5">
+                    <Loader2 className="h-3.5 w-3.5 animate-spin text-amber-300" />
+                    <span className="font-mono text-[10px] uppercase tracking-widest text-amber-200/80">
+                      AI analyzing clip…
                     </span>
+                  </div>
+                )}
+                {aiStatus === 'done' && analysis?.analyzedBy === 'ai' && (evidence?.findings ?? []).map((finding) => {
+                  const tone =
+                    finding.tone === 'good'
+                      ? 'text-emerald-300'
+                      : finding.tone === 'warn'
+                        ? 'text-amber-300'
+                        : finding.tone === 'bad'
+                          ? 'text-rose-300'
+                          : 'text-white/50';
+                  const dot =
+                    finding.tone === 'good'
+                      ? 'bg-emerald-400'
+                      : finding.tone === 'warn'
+                        ? 'bg-amber-400'
+                        : finding.tone === 'bad'
+                          ? 'bg-rose-400'
+                          : 'bg-white/30';
+                  return (
+                    <motion.div
+                      key={finding.id}
+                      initial={{ opacity: 0, x: -8 }}
+                      animate={{ opacity: 1, x: 0 }}
+                      transition={{ duration: 0.35 }}
+                      className="flex items-center justify-between gap-3 rounded-xl border border-white/10 bg-white/[0.03] px-3 py-2.5"
+                    >
+                      <span className="flex items-center gap-2 text-xs text-white/65">
+                        <span className={cn('h-1.5 w-1.5 rounded-full', dot)} />
+                        {finding.label}
+                      </span>
+                      <span className={cn('font-mono text-xs font-semibold', tone)}>
+                        {finding.value}
+                      </span>
+                    </motion.div>
+                  );
+                })}
+                {aiStatus === 'done' && analysis?.analyzedBy !== 'ai' && (
+                  <div className="rounded-xl border border-white/10 bg-white/[0.03] px-4 py-4 text-center">
+                    <AlertTriangle className="mx-auto h-5 w-5 text-white/40" />
+                    <p className="mt-2 text-xs text-white/55">
+                      AI could not read this clip — watch the video frame-by-frame and decide.
+                    </p>
+                  </div>
+                )}
+              </div>
+
+              {/* Audio strip — real decoded audio from the clip */}
+              <SnickMeter audio={audio} markerAtMs={contactMs} label="ULTRAEDGE" />
+
+              {/* Ball tracking inset — 3D scene rendered small. AI data only. */}
+              {analysis?.analyzedBy === 'ai' && evidence?.trajectory && evidence.trajectory.length >= 2 && (
+                <div>
+                  <div className="mb-1.5 flex items-center justify-between">
+                    <p className="font-mono text-[10px] font-semibold uppercase tracking-[0.24em] text-white/45">
+                      Ball Tracking
+                    </p>
                     <button
                       type="button"
-                      onClick={() => setFootageOpen(false)}
-                      aria-label="Close footage panel"
-                      className="rounded-lg border border-white/10 p-1.5 text-white/50 hover:text-white"
+                      onClick={() => setShowTrajectory((v) => !v)}
+                      aria-pressed={showTrajectory}
+                      className={cn(
+                        'rounded-full px-2 py-0.5 font-mono text-[9px] font-semibold uppercase tracking-widest transition-colors',
+                        showTrajectory
+                          ? 'bg-amber-400/15 text-amber-300 ring-1 ring-amber-400/25'
+                          : 'text-white/40 hover:text-white',
+                      )}
                     >
-                      <X className="h-3.5 w-3.5" />
+                      {showTrajectory ? 'Overlay ON' : 'Overlay'}
                     </button>
                   </div>
-                  {footagePanel}
+                  <div className="overflow-hidden rounded-lg border border-white/10">
+                    <DrsScene
+                      type={reviewType}
+                      progress={evidence.impact ? 0.8 : 0.5}
+                      view="top"
+                      overlays={true}
+                      zoom={1}
+                    />
+                  </div>
+                </div>
+              )}
+
+              {/* Reason */}
+              {(analysis?.analyzedBy === 'ai' || evidence) && (
+                <div className="rounded-xl border border-white/10 bg-white/[0.02] px-3 py-3">
+                  <p className="font-mono text-[10px] font-semibold uppercase tracking-[0.24em] text-white/45">
+                    Analysis
+                  </p>
+                  <p className="mt-1.5 text-xs leading-relaxed text-white/55">
+                    {analysis?.analyzedBy === 'ai' && analysis.reason
+                      ? analysis.reason
+                      : 'No AI analysis for this clip — review the video frame-by-frame.'}
+                  </p>
                 </div>
               )}
             </div>
 
-            {/* Evidence sidebar — desktop */}
-            <aside aria-label="Review evidence" className="hidden shrink-0 flex-col border-l border-white/10 bg-[#0a0e16]/80 lg:flex">
-              <div className="space-y-5 overflow-y-auto p-5">
-                <div>
-                  <p className="flex items-center gap-1.5 font-mono text-[10px] font-semibold uppercase tracking-[0.24em] text-white/45">
-                    <Scale className="h-3 w-3" />
-                    Frame Analysis
-                  </p>
-                  <h3 className="mt-1.5 text-base font-semibold tracking-tight text-foreground">{label}</h3>
-                  {aiStatus === 'analyzing' && (
-                    <span className="mt-1.5 inline-flex items-center gap-1.5 rounded-full bg-amber-400/10 px-2.5 py-1 font-mono text-[9px] font-semibold uppercase tracking-widest text-amber-300 ring-1 ring-amber-400/25">
-                      <Loader2 className="h-3 w-3 animate-spin" />
-                      Analyzing clip…
-                    </span>
-                  )}
-                  {aiStatus === 'done' && analysis?.analyzedBy === 'ai' && (
-                    <span className="mt-1.5 inline-flex items-center gap-1.5 rounded-full bg-emerald-400/10 px-2.5 py-1 font-mono text-[9px] font-semibold uppercase tracking-widest text-emerald-300 ring-1 ring-emerald-400/25">
-                      <Sparkles className="h-3 w-3" />
-                      AI · {(analysis.model ?? 'gemini').replace(/^gemini-/, '').split('-').join(' ')}
-                    </span>
-                  )}
-                  <p className="mt-1 text-xs text-white/55">
-                    {reviewType === 'lbw' && 'Pitching line and wicket projection from the top-down camera.'}
-                    {reviewType === 'caught' && 'Contact frame checked against the audio spike.'}
-                    {reviewType === 'runout' && 'Crease + bails timed frame-by-frame.'}
-                    {reviewType === 'stumping' && 'Keeper gather timed against bat grounding.'}
-                    {reviewType === 'boundary' && 'Rope contact checked from the rope camera.'}
-                  </p>
-
-                  {/* Review type — standalone uploaded reviews are not tied to a match */}
-                  {isStandalone && scope === 'capture' && (
-                    <div className="mt-3">
-                      <p className="font-mono text-[10px] font-semibold uppercase tracking-[0.24em] text-white/45">
-                        Review type
-                      </p>
-                      <div className="mt-2 flex flex-wrap gap-1.5">
-                        {(['lbw', 'caught', 'runout', 'stumping', 'boundary'] as ReviewTypeId[]).map((t) => (
-                          <button
-                            key={t}
-                            type="button"
-                            onClick={() => setReviewType(t)}
-                            aria-pressed={reviewType === t}
-                            className={cn(
-                              'rounded-full border px-2.5 py-1 font-mono text-[10px] font-semibold uppercase tracking-widest transition-colors',
-                              reviewType === t
-                                ? 'border-amber-400/40 bg-amber-400/15 text-amber-300'
-                                : 'border-white/10 text-white/50 hover:text-white',
-                            )}
-                          >
-                            {t === 'runout' ? 'Run Out' : t}
-                          </button>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-                </div>
-
-                {/* Live capture indicator */}
-                {scope === 'capture' && (
-                  <div className="rounded-xl border border-white/10 bg-white/[0.03] px-3 py-3">
-                    <div className="flex items-center justify-between">
-                      <span className="flex items-center gap-1.5 font-mono text-[9px] font-semibold uppercase tracking-[0.2em] text-emerald-300">
-                        <Activity className="h-3 w-3 animate-pulse" />
-                        Live capture
-                      </span>
-                      <span className="font-mono text-[9px] uppercase tracking-widest text-white/40">
-                        Umpire signal · Review
-                      </span>
-                    </div>
-                    <div className="mt-3 flex h-8 items-end gap-1">
-                      {Array.from({ length: 24 }, (_, i) => (
-                        <motion.span
-                          key={i}
-                          animate={{ scaleY: [0.3, 0.9, 0.4], opacity: [0.5, 1, 0.5] }}
-                          transition={{
-                            duration: 0.8 + (i % 5) * 0.18,
-                            repeat: Infinity,
-                            repeatType: 'mirror',
-                            ease: 'easeInOut',
-                          }}
-                          className="w-1 origin-bottom rounded-full bg-emerald-400/70"
-                          style={{ height: `${28 * (0.4 + Math.abs(Math.sin(i * 1.7) * 0.6))}px` }}
-                        />
-                      ))}
-                    </div>
-                  </div>
-                )}
-
-                {/* Findings */}
-                {scope === 'analysis' && (
-                  <div className="space-y-2">
-                    {aiStatus === 'analyzing' && (
-                      <div className="flex items-center gap-2 rounded-xl border border-amber-400/20 bg-amber-400/[0.05] px-3 py-2.5">
-                        <Loader2 className="h-3.5 w-3.5 animate-spin text-amber-300" />
-                        <span className="font-mono text-[10px] uppercase tracking-widest text-amber-200/80">
-                          AI analyzing clip…
-                        </span>
-                      </div>
-                    )}
-                    {(evidence?.findings ?? []).map((finding) => {
-                      const tone =
-                        finding.tone === 'good'
-                          ? 'text-emerald-300'
-                          : finding.tone === 'warn'
-                            ? 'text-amber-300'
-                            : 'text-rose-300';
-                      const dot =
-                        finding.tone === 'good'
-                          ? 'bg-emerald-400'
-                          : finding.tone === 'warn'
-                            ? 'bg-amber-400'
-                            : 'bg-rose-400';
-                      return (
-                        <motion.div
-                          key={finding.id}
-                          initial={{ opacity: 0, x: -8 }}
-                          animate={{ opacity: 1, x: 0 }}
-                          transition={{ duration: 0.35 }}
-                          className="flex items-center justify-between gap-3 rounded-xl border border-white/10 bg-white/[0.03] px-3 py-2.5"
-                        >
-                          <span className="flex items-center gap-2 text-xs text-white/65">
-                            <span className={cn('h-1.5 w-1.5 rounded-full', dot)} />
-                            {finding.label}
-                          </span>
-                          <span className={cn('font-mono text-xs font-semibold', tone)}>
-                            {finding.value}
-                          </span>
-                        </motion.div>
-                      );
-                    })}
-                    {!evidence && (
-                      <div className="space-y-2">
-                        {[0, 1, 2].map((i) => (
-                          <div key={i} className="h-11 animate-pulse rounded-xl border border-white/10 bg-white/[0.04]" />
-                        ))}
-                      </div>
-                    )}
-                  </div>
-                )}
-
-                {/* Cameras */}
-                {(evidence?.cameras && evidence.cameras.length > 0 && scope !== 'reveal') && (
-                  <div>
-                    <p className="font-mono text-[10px] font-semibold uppercase tracking-[0.24em] text-white/45">
-                      Cameras
-                    </p>
-                    <div className="mt-2 space-y-1.5">
-                      {evidence.cameras.map((cam) => (
-                        <div key={cam.id} className="flex items-center justify-between gap-2 rounded-lg border border-white/10 bg-white/[0.02] px-3 py-2">
-                          <span className="flex items-center gap-2 font-mono text-[11px] font-semibold text-white/80">
-                            <Camera className="h-3 w-3 text-white/40" />
-                            {cam.name}
-                          </span>
-                          <span className="font-mono text-[10px] uppercase tracking-widest text-white/40">
-                            {cam.resolution} {cam.fps}fps
-                          </span>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                )}
-                {!evidence && scope !== 'reveal' && (
-                  <div>
-                    <p className="font-mono text-[10px] font-semibold uppercase tracking-[0.24em] text-white/45">
-                      Cameras
-                    </p>
-                    <div className="mt-2 space-y-1.5">
-                      {[0, 1, 2].map((i) => (
-                        <div key={i} className="h-9 animate-pulse rounded-lg border border-white/10 bg-white/[0.03]" />
-                      ))}
-                    </div>
-                  </div>
-                )}
-              </div>
-
-              {/* Analysis -> reveal */}
-              {phase === 'analysis' && (
-                <div className="border-t border-white/10 p-4">
-                  <button
-                    type="button"
-                    onClick={() => setPhase('reveal')}
-                    className="flex h-11 w-full items-center justify-center gap-2 rounded-xl bg-amber-400 px-4 text-sm font-semibold text-[#0a0e16] shadow-lg shadow-amber-400/20 transition-all hover:bg-amber-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/60"
-                  >
-                    <ShieldAlert className="h-4 w-4" />
-                    REVEAL DECISION
-                  </button>
-                </div>
-              )}
-
-              {/* Capture -> rewind hint */}
-              {phase === 'capture' && (
-                <div className="flex items-center gap-2 border-t border-white/10 p-4 text-[10px] text-white/40">
-                  <ScanLine className="h-3.5 w-3.5 shrink-0 text-cyan-300" />
-                  Auto-capture armed. Use the timeline to freeze the impact frame.
-                </div>
-              )}
-            </aside>
-          </div>
-        )}
-
-        {/* Center broadcast flash */}
-        <AnimatePresence>
-          {flash && phase !== 'reveal' && (
-            <motion.div
-              key={flash}
-              initial={{ opacity: 0, scale: 0.9 }}
-              animate={{ opacity: 1, scale: 1 }}
-              exit={{ opacity: 0 }}
-              transition={{ duration: 0.3 }}
-              className="pointer-events-none absolute inset-0 z-30 flex items-center justify-center"
-            >
-              <div className="rounded-lg border border-amber-400/40 bg-black/60 px-6 py-3 font-mono text-sm font-bold uppercase tracking-[0.3em] text-amber-300 shadow-[0_0_60px_rgba(251,191,36,0.25)] backdrop-blur-sm">
-                {flash}
-              </div>
-            </motion.div>
-          )}
-        </AnimatePresence>
-      </main>
-
-      {/* Bottom timeline */}
-      {phase !== 'reveal' && (
-        <section className="relative z-20 shrink-0 border-t border-white/10 bg-[#0a0e16] px-4 py-3 sm:px-6">
-          <div className="group cursor-pointer touch-none" onClick={seekFromPointer} onPointerDown={seekFromPointer}>
-            <div className="flex items-center justify-between">
-              {SEGMENTS.map((segment) => (
+            {/* Decision bar at the bottom of the sidebar */}
+            <div className="border-t border-white/10 p-4">
+              <div className="mb-2 flex items-center justify-between">
+                <span className="font-mono text-[10px] font-semibold uppercase tracking-[0.24em] text-white/45">
+                  On-field call
+                </span>
                 <span
-                  key={segment.id}
                   className={cn(
-                    'pb-1 font-mono text-[9px] font-semibold uppercase tracking-[0.22em] sm:text-[10px]',
-                    progress >= segment.from ? 'text-amber-300' : 'text-white/30',
+                    'rounded-full border px-2.5 py-0.5 font-mono text-[10px] font-semibold uppercase tracking-widest',
+                    onFieldFor(reviewType) === 'OUT'
+                      ? 'border-rose-500/30 bg-rose-500/10 text-rose-300'
+                      : 'border-emerald-500/30 bg-emerald-500/10 text-emerald-300',
                   )}
                 >
-                  {segment.label}
+                  {onFieldFor(reviewType)}
                 </span>
-              ))}
+              </div>
+              <p className="mb-2 font-mono text-[10px] font-semibold uppercase tracking-[0.24em] text-white/45">
+                Third umpire decision
+              </p>
+              <div className="flex gap-1.5">
+                {(['OUT', 'NOT OUT', 'INCONCLUSIVE'] as Decision[]).map((d) => (
+                  <button
+                    key={d}
+                    type="button"
+                    onClick={() => { setDecision(d); setPhase('reveal'); }}
+                    className={cn(
+                      'flex-1 rounded-xl px-2 py-2.5 font-mono text-[10px] font-bold uppercase tracking-widest transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/60',
+                      d === 'OUT'
+                        ? 'bg-rose-500/15 text-rose-300 ring-1 ring-rose-500/30 hover:bg-rose-500/25'
+                        : d === 'NOT OUT'
+                          ? 'bg-emerald-500/15 text-emerald-300 ring-1 ring-emerald-500/30 hover:bg-emerald-500/25'
+                          : 'bg-amber-500/15 text-amber-300 ring-1 ring-amber-500/30 hover:bg-amber-500/25',
+                    )}
+                  >
+                    {d === 'NOT OUT' ? 'NOT OUT' : d}
+                  </button>
+                ))}
+              </div>
             </div>
-            <div className="relative h-2.5 rounded-full bg-white/10">
+          </aside>
+        </div>
+      )}
+
+      {/* Bottom timeline — always visible in review mode */}
+      {phase === 'review' && (
+        <section className="relative z-20 shrink-0 border-t border-white/10 bg-[#0a0e16] px-4 py-3 sm:px-6">
+          <div
+            className="group cursor-pointer touch-none"
+            onClick={seekFromPointer}
+            onPointerDown={seekFromPointer}
+          >
+            {/* Waveform bars behind the playhead */}
+            {audio?.peaks && audio.peaks.length > 0 ? (
+              <div className="relative mb-1 flex h-6 items-end gap-px" aria-hidden="true">
+                {audio.peaks.map((level, index) => {
+                  const t = index / Math.max(1, audio.peaks.length - 1);
+                  const isPast = t * duration <= currentTime;
+                  return (
+                    <span
+                      key={index}
+                      className={cn(
+                        'w-full origin-center rounded-[1px]',
+                        isPast ? 'bg-amber-400/60' : 'bg-teal-400/30',
+                      )}
+                      style={{ height: `${Math.max(8, level * 100)}%` }}
+                    />
+                  );
+                })}
+                {contactMs != null && (
+                  <span
+                    className="pointer-events-none absolute top-0 h-full w-px bg-rose-400/80"
+                    style={{ left: `${(contactMs / 1000 / Math.max(1, duration)) * 100}%` }}
+                  />
+                )}
+              </div>
+            ) : (
+              <div className="relative h-2.5 rounded-full bg-white/10">
+                <div
+                  aria-hidden="true"
+                  className="absolute inset-y-0 left-0 rounded-full bg-gradient-to-r from-amber-500/70 to-amber-400/70 transition-[width] duration-100"
+                  style={{ width: `${playheadPercent}%` }}
+                />
+              </div>
+            )}
+            {/* Playhead */}
+            <div
+              className="relative h-2.5"
+            >
+              <div className="absolute inset-y-0 left-0 rounded-full bg-white/10" />
               <div
-                aria-hidden="true"
                 className="absolute inset-y-0 left-0 rounded-full bg-gradient-to-r from-amber-500/70 to-amber-400/70 transition-[width] duration-100"
-                style={{ width: `${progress * 100}%` }}
+                style={{ width: `${playheadPercent}%` }}
               />
-              {SEGMENTS.map((segment) => (
-                <span key={segment.id} className="absolute top-0 h-full w-px bg-white/15" style={{ left: `${segment.to * 100}%` }} />
-              ))}
               <div
                 className="absolute top-1/2 z-10 h-4 w-4 -translate-x-1/2 -translate-y-1/2 rounded-full border-2 border-amber-300 bg-[#0a0e16] shadow-[0_0_12px_rgba(251,191,36,0.6)]"
-                style={playheadStyle}
+                style={{ left: `${playheadPercent}%` }}
               >
                 <span className="absolute -top-3 left-1/2 h-2 w-0.5 -translate-x-1/2 bg-amber-300" />
               </div>
@@ -975,22 +920,28 @@ export function ReviewWorkstation({
 
           <div className="mt-2.5 flex items-center justify-between font-mono text-[10px] font-medium uppercase tracking-widest text-white/40">
             <span>
-              Frame <span className="text-amber-300">{String(frame).padStart(3, '0')}</span> / {TOTAL_FRAMES - 1}
+              Frame <span className="text-amber-300">{String(frame).padStart(3, '0')}</span> / {totalFrames}
             </span>
-            <span className="hidden sm:inline">
-              {label} · {ball} · <span className="text-cyan-300">240 fps</span>
-            </span>
+            <span className="hidden sm:inline">{label}</span>
             <span>
-              <span className="text-amber-300">{timestamp}</span> / {formatTime(TOTAL_SECONDS)}
+              <span className="text-amber-300">{formatTime(currentTime)}</span> / {formatTime(duration)}
             </span>
           </div>
         </section>
       )}
 
-      {/* Controls */}
-      {phase !== 'reveal' && (
+      {/* Controls — review mode only */}
+      {phase === 'review' && (
         <section className="relative z-20 flex shrink-0 flex-wrap items-center justify-center gap-2 border-t border-white/10 bg-[#0a0e16] px-4 py-3">
           <div className="flex items-center gap-1.5">
+            <button
+              type="button"
+              onClick={replay}
+              aria-label="Replay from start"
+              className="flex h-10 w-10 items-center justify-center rounded-xl border border-white/10 text-white/70 transition-colors hover:border-amber-400/30 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/60"
+            >
+              <RotateCcw className="h-4 w-4" />
+            </button>
             <button
               type="button"
               onClick={play}
@@ -999,17 +950,9 @@ export function ReviewWorkstation({
             >
               {playing ? <Pause className="h-4 w-4" /> : <Play className="h-4 w-4" />}
             </button>
-            <button
-              type="button"
-              onClick={replay}
-              aria-label="Replay sequence"
-              className="flex h-10 w-10 items-center justify-center rounded-xl border border-white/10 text-white/70 transition-colors hover:border-amber-400/30 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/60"
-            >
-              <RotateCcw className="h-4 w-4" />
-            </button>
           </div>
 
-          {/* Slow motion — 0.25x / 0.5x / 1x / 2x */}
+          {/* Slow motion */}
           <div className="mx-1 hidden h-10 items-center rounded-xl border border-white/10 p-1 sm:flex">
             {SPEEDS.map((value) => (
               <button
@@ -1054,7 +997,7 @@ export function ReviewWorkstation({
           <div className="mx-1 hidden h-10 items-center rounded-xl border border-white/10 p-1 md:flex">
             <button
               type="button"
-              onClick={() => adjustZoom(-0.25)}
+              onClick={() => setZoom((v) => Math.max(1, v - 0.25))}
               aria-label="Zoom out"
               className="flex h-8 w-8 items-center justify-center rounded-lg text-white/60 transition-colors hover:bg-white/5 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/60"
             >
@@ -1063,7 +1006,7 @@ export function ReviewWorkstation({
             <span className="w-10 text-center font-mono text-[11px] font-semibold text-amber-300">{zoom.toFixed(2)}x</span>
             <button
               type="button"
-              onClick={() => adjustZoom(0.25)}
+              onClick={() => setZoom((v) => Math.min(3, v + 0.25))}
               aria-label="Zoom in"
               className="flex h-8 w-8 items-center justify-center rounded-lg text-white/60 transition-colors hover:bg-white/5 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/60"
             >
@@ -1071,82 +1014,36 @@ export function ReviewWorkstation({
             </button>
           </div>
 
-          {/* Manual frame scrub (mobile/tablet) */}
-          <div className="flex items-center gap-2 md:hidden">
-            <button
-              type="button"
-              onClick={() => stepFrame(-10)}
-              aria-label="Back 10 frames"
-              className="flex h-8 items-center rounded-lg border border-white/10 px-2.5 font-mono text-[10px] text-white/60 transition-colors hover:border-amber-400/30 hover:text-white"
+          {/* Decision hint — mobile */}
+          <div className="ml-1 flex items-center gap-2 rounded-xl border border-amber-400/25 bg-amber-400/[0.06] px-3.5 py-2">
+            <span
+              className={cn(
+                'font-mono text-xs font-bold uppercase tracking-[0.2em]',
+                decision === 'NOT OUT' ? 'text-emerald-300' : decision === 'OUT' ? 'text-rose-300' : 'text-amber-300',
+              )}
             >
-              -10f
-            </button>
-            <button
-              type="button"
-              onClick={() => stepFrame(10)}
-              aria-label="Forward 10 frames"
-              className="flex h-8 items-center rounded-lg border border-white/10 px-2.5 font-mono text-[10px] text-white/60 transition-colors hover:border-amber-400/30 hover:text-white"
-            >
-              +10f
-            </button>
+              {decision}
+            </span>
+            <span className="hidden font-mono text-[10px] uppercase tracking-widest text-white/40 sm:inline">
+              {verdictNote}
+            </span>
           </div>
 
-          {/* Reveal trigger (mobile/tablet) */}
-          {phase === 'analysis' && (
-            <button
-              type="button"
-              onClick={() => setPhase('reveal')}
-              className="inline-flex h-10 items-center justify-center gap-2 rounded-xl bg-amber-400/90 px-4 font-mono text-[11px] font-bold uppercase tracking-widest text-[#0a0e16] transition-all hover:bg-amber-300 lg:hidden"
-            >
-              <ShieldAlert className="h-3.5 w-3.5" />
-              Reveal Decision
-            </button>
-          )}
-
-          {/* Review type — standalone (mobile/tablet) */}
-          {isStandalone && phase === 'capture' && (
-            <div className="flex flex-wrap items-center justify-center gap-1.5">
-              {(['lbw', 'caught', 'runout', 'stumping', 'boundary'] as ReviewTypeId[]).map((t) => (
-                <button
-                  key={t}
-                  type="button"
-                  onClick={() => setReviewType(t)}
-                  aria-pressed={reviewType === t}
-                  className={cn(
-                    'rounded-full border px-2.5 py-1.5 font-mono text-[10px] font-semibold uppercase tracking-widest transition-colors',
-                    reviewType === t
-                      ? 'border-amber-400/40 bg-amber-400/15 text-amber-300'
-                      : 'border-white/10 text-white/50 hover:text-white',
-                  )}
-                >
-                  {t === 'runout' ? 'Run Out' : t}
-                </button>
-              ))}
-            </div>
-          )}
-
-          {/* Decision note */}
-          {phase === 'capture' && decision && (
-            <div className="ml-1 flex items-center gap-2 rounded-xl border border-amber-400/25 bg-amber-400/[0.06] px-3.5 py-2">
-              <span
-                className={cn(
-                  'font-mono text-xs font-bold uppercase tracking-[0.2em]',
-                  decision === 'NOT OUT' ? 'text-emerald-300' : decision === 'OUT' ? 'text-rose-300' : 'text-amber-300',
-                )}
-              >
-                {decision}
-              </span>
-              <span className="hidden font-mono text-[10px] uppercase tracking-widest text-white/40 sm:inline">
-                {verdictNote}
-              </span>
-            </div>
-          )}
+          {/* Mobile decision trigger */}
+          <button
+            type="button"
+            onClick={() => setPhase('reveal')}
+            className="inline-flex h-10 items-center justify-center gap-2 rounded-xl bg-amber-400/90 px-4 font-mono text-[11px] font-bold uppercase tracking-widest text-[#0a0e16] transition-all hover:bg-amber-300 lg:hidden"
+          >
+            <ShieldAlert className="h-3.5 w-3.5" />
+            Review Decision
+          </button>
         </section>
       )}
 
       {/* Bottom hint */}
       <footer className="flex shrink-0 flex-wrap items-center justify-center gap-x-4 gap-y-1 border-t border-white/5 bg-[#06080d] px-4 py-2 font-mono text-[9px] uppercase tracking-widest text-white/25">
-        {phase !== 'reveal' ? (
+        {phase === 'review' ? (
           <>
             <span><kbd className="rounded border border-white/10 px-1.5 py-0.5">Space</kbd> Play / Pause</span>
             <span>
@@ -1164,17 +1061,6 @@ export function ReviewWorkstation({
           </>
         )}
       </footer>
-
-      {/* Reason strip */}
-      {phase === 'reveal' && evidence && (
-        <div className="relative z-20 shrink-0 border-t border-white/10 bg-[#0a0e16] px-4 py-3 text-center">
-          <span className="font-mono text-[10px] font-medium uppercase tracking-widest text-white/50 sm:text-[11px]">
-            {analysis?.analyzedBy === 'ai' && analysis?.reason
-              ? analysis.reason
-              : reasonFor(reviewType, decision)}
-          </span>
-        </div>
-      )}
     </motion.div>
   );
 }

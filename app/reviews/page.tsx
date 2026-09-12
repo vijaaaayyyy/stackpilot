@@ -14,13 +14,13 @@ export default function ReviewsPage() {
       <TurfPageHeader
         eyebrow="Turf DRS"
         title="Review History"
-        description="Card by card — every review you have run, the on-field call, the final decision, and how it changed the match."
+        description="Card by card — every review you have run, the on-field call, the final decision, and how it changed."
       />
 
       <div className="pointer-events-none absolute left-1/2 top-0 -z-10 h-[400px] w-[700px] -translate-x-1/2 rounded-full bg-amber-500/10 blur-[120px]" />
 
       <div className="mx-auto mt-12 max-w-3xl">
-        <ReviewHistory matchLabel="Falcons vs Strikers · HTL" />
+        <ReviewHistory />
       </div>
     </TurfShell>
   );

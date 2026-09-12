@@ -7,6 +7,7 @@
 
 import { useEffect, useRef } from 'react';
 import * as THREE from 'three';
+import * as CANNON from 'cannon-es';
 import { RoomEnvironment } from 'three/examples/jsm/environments/RoomEnvironment.js';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
 import {
@@ -355,6 +356,53 @@ export function ThreeDrsScene({
     batterStumps.position.set(0, 0, STUMP_Z);
     scene.add(batterStumps);
 
+    /* ----------------------- Physics (stump break) ----------------------- */
+    /* cannon-es world: stumps pivot on real hinges at their planted base and
+       bails are free spheres with ground bounce. Bodies mirror the
+       batterStumps pivots (parallel to children order). */
+    const physicsWorld = new CANNON.World({ gravity: new CANNON.Vec3(0, -9.8, 0) });
+    physicsWorld.allowSleep = true;
+    physicsWorld.defaultContactMaterial.friction = 0.3;
+    physicsWorld.defaultContactMaterial.restitution = 0.25;
+
+    const physicsGround = new CANNON.Body({ mass: 0 });
+    physicsGround.addShape(new CANNON.Plane());
+    physicsGround.quaternion.setFromEuler(-Math.PI / 2, 0, 0);
+    physicsWorld.addBody(physicsGround);
+
+    const physicsBodies: (CANNON.Body | null)[] = [];
+    let physicsArmed = false;
+
+    batterStumps.children.forEach((child) => {
+      if (child.userData.knock) {
+        const body = new CANNON.Body({
+          mass: 2,
+          shape: new CANNON.Cylinder(0.052, 0.052, STUMP_HEIGHT, 12),
+          position: new CANNON.Vec3(child.position.x, STUMP_HEIGHT / 2, child.position.z),
+        });
+        physicsWorld.addBody(body);
+        physicsWorld.addConstraint(
+          new CANNON.HingeConstraint(body, physicsGround, {
+            pivotA: new CANNON.Vec3(0, -STUMP_HEIGHT / 2, 0),
+            pivotB: new CANNON.Vec3(child.position.x, 0, child.position.z),
+            axisA: new CANNON.Vec3(1, 0, 0),
+            axisB: new CANNON.Vec3(1, 0, 0),
+          }),
+        );
+        physicsBodies.push(body);
+      } else if (child.userData.bail) {
+        const body = new CANNON.Body({
+          mass: 0.45,
+          shape: new CANNON.Sphere(0.02),
+          position: new CANNON.Vec3(child.position.x, BAIL_GROOVE_Y, 0),
+        });
+        physicsWorld.addBody(body);
+        physicsBodies.push(body);
+      } else {
+        physicsBodies.push(null);
+      }
+    });
+
     /* Simple silhouettes — keeper / bowler / batter context */
     const figureMat = new THREE.MeshStandardMaterial({
       color: '#141e33',
@@ -583,28 +631,69 @@ export function ThreeDrsScene({
         }
       });
 
-      /* Stump destruction — deterministic from progress, reverses on replay.
-         Stumps topple around their planted base, bails fly up and forward. */
-      const fallU = Math.min(Math.max((s.progress - IMPACT_T) / (1 - IMPACT_T), 0), 1);
-      const fall = fallU * fallU * (3 - 2 * fallU);
-      const destroying = destroy && fall > 0;
-      batterStumps.children.forEach((child, i) => {
-        if (child.userData.knock) {
-          child.rotation.x = destroying ? -fall * (i % 3 === 1 ? 1.35 : i % 3 === 0 ? 1.0 : 0.85) : 0;
-        } else if (child.userData.bail) {
-          if (destroying) {
-            child.position.z = fall * 0.55;
-            child.position.y = BAIL_GROOVE_Y + Math.sin(Math.min(fall * 1.7, 1) * Math.PI) * 0.2 + (0.02 - BAIL_GROOVE_Y) * fall;
-            child.rotation.x = -fall * 1.4;
-            child.rotation.z = -fall * 1.1;
-          } else {
-            child.position.z = 0;
-            child.position.y = BAIL_GROOVE_Y;
-            child.rotation.x = 0;
-            child.rotation.z = 0;
-          }
+      /* Stump destruction — real physics. When the ball connects, stumps rock
+         over on their base hinges (away from the bowler) and bails are flicked
+         up and forward; the sim keeps settling even when frozen on frame 300,
+         and it resets when the timeline returns before impact. */
+      if (s.progress <= IMPACT_T) {
+        if (physicsArmed) {
+          physicsArmed = false;
+          batterStumps.children.forEach((child, i) => {
+            const body = physicsBodies[i];
+            if (!body) return;
+            body.sleepState = CANNON.Body.AWAKE;
+            body.velocity.setZero();
+            body.angularVelocity.setZero();
+            if (child.userData.knock) {
+              body.position.set(child.position.x, STUMP_HEIGHT / 2, child.position.z);
+              body.quaternion.set(0, 0, 0, 1);
+              child.quaternion.identity();
+            } else if (child.userData.bail) {
+              body.position.set(child.position.x, BAIL_GROOVE_Y, 0);
+              body.quaternion.set(0, 0, 0, 1);
+              child.position.set(child.position.x, BAIL_GROOVE_Y, 0);
+              child.quaternion.identity();
+            }
+          });
         }
-      });
+      } else {
+        /* First frame past impact — fire the break */
+        if (!physicsArmed) {
+          physicsArmed = true;
+          batterStumps.children.forEach((child, i) => {
+            const body = physicsBodies[i];
+            if (!body) return;
+            body.wakeUp();
+            if (child.userData.knock) {
+              /* positive x is toward the batter — away from the bowler */
+              const base = i % 3 === 1 ? 3.0 : i % 3 === 0 ? 1.9 : 2.5;
+              body.angularVelocity.x = base + Math.random() * 0.8;
+            } else if (child.userData.bail) {
+              body.velocity.set(
+                (Math.random() - 0.5) * 2.2,
+                3.6 + Math.random() * 1.8,
+                (Math.random() - 0.5) * 2.8,
+              );
+              body.angularVelocity.set(
+                (Math.random() - 0.5) * 6,
+                (Math.random() - 0.5) * 6,
+                (Math.random() - 0.5) * 6,
+              );
+            }
+          });
+        }
+        physicsWorld.step(1 / 60, Math.min(dt + 0.002, 1 / 30), 4);
+        batterStumps.children.forEach((child, i) => {
+          const body = physicsBodies[i];
+          if (!body) return;
+          if (child.userData.knock) {
+            child.quaternion.set(body.quaternion.x, body.quaternion.y, body.quaternion.z, body.quaternion.w);
+          } else if (child.userData.bail) {
+            child.position.set(body.position.x, body.position.y, body.position.z);
+            child.quaternion.set(body.quaternion.x, body.quaternion.y, body.quaternion.z, body.quaternion.w);
+          }
+        });
+      }
 
       /* HTML overlay chips — project world points into screen space */
       const impactWorld = bounceWorld();
@@ -651,6 +740,8 @@ export function ThreeDrsScene({
       ro.disconnect();
       controls.dispose();
       pmrem.dispose();
+      physicsWorld.constraints.slice().forEach((c) => physicsWorld.removeConstraint(c));
+      physicsWorld.bodies.slice().forEach((b) => physicsWorld.removeBody(b));
       scene.traverse((obj) => {
         const mesh = obj as THREE.Mesh;
         if (mesh.geometry) mesh.geometry.dispose();

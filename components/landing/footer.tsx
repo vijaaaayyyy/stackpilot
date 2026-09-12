@@ -6,7 +6,7 @@ const footerLinks: Record<string, { label: string; href: string }[]> = {
   Product: [
     { label: 'Features', href: '/features' },
     { label: 'Explore', href: '/explore' },
-    { label: 'Browse Providers', href: '/browse/providers' },
+    { label: 'Browse Venues', href: '/browse/providers' },
     { label: 'Pricing', href: '/pricing' },
     { label: 'Changelog', href: '/changelog' },
   ],

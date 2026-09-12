@@ -9,7 +9,6 @@ import { FaqSection } from '@/components/landing/faq-section';
 import { DocsSection } from '@/components/landing/docs-section';
 import { CTA } from '@/components/landing/cta';
 import { Footer } from '@/components/landing/footer';
-import { DynamicIsland } from '@/components/landing/dynamic-island';
 import { ScrollLightField, LightReveal, SectionGlow } from '@/components/cinematic/scroll-lighting';
 import { CanvasParticles } from '@/components/ui/canvas-particles';
 import { siteConfig, absoluteUrl } from '@/lib/site';
@@ -95,7 +94,6 @@ export default function Home() {
         <CTA />
       </LightReveal>
       <Footer />
-      <DynamicIsland />
     </main>
   );
 }

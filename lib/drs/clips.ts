@@ -209,9 +209,10 @@ export type ClipUploadResult = { clip: ReviewClip; ok: boolean };
 
 /**
  * Upload a captured blob to Supabase Storage (`drs-clips` private bucket,
- * `{match_id}/{ball_id}.webm`) and refresh the local index. The returned clip
- * carries a time-limited signed URL for playback; callers should re-resolve
- * via `resolveClipUrl` once it expires.
+ * `{match_id}/{ball_id}.webm`, or `{owner_id}/{ball_id}.webm` outside a match)
+ * and refresh the local index. The returned clip carries a time-limited signed
+ * URL for playback; callers should re-resolve via `resolveClipUrl` once it
+ * expires.
  */
 export async function uploadClip(
   blob: Blob,
@@ -220,7 +221,31 @@ export async function uploadClip(
 ): Promise<ClipUploadResult> {
   const owner = await currentUserId();
   const folder = metadata?.matchId || owner;
-  const path = `${folder}/${ballId}.webm`;
+  const clip = await uploadBlob(blob, ballId, folder, '.webm', metadata?.durationMs);
+  return { clip, ok: Boolean(clip.url) && !clip.url.startsWith('blob:') };
+}
+
+/**
+ * Standalone review clip — upload any video file from the gallery/camera roll
+ * and key it by its own clip id (`clip-…`) so it becomes an independent review
+ * in the log instead of belonging to a match + ball.
+ */
+export async function uploadVideoFile(file: Blob, name: string): Promise<ReviewClip> {
+  const id = `clip-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
+  const ext = `.${(name.split('.').pop() ?? 'webm').toLowerCase()}`;
+  return uploadBlob(file, id, 'standalone', ext, undefined, name);
+}
+
+async function uploadBlob(
+  blob: Blob,
+  ballId: string,
+  folder: string,
+  ext: string,
+  durationMs?: number,
+  name = `${ballId}${ext}`,
+): Promise<ReviewClip> {
+  const normalizedExt = /^\.(webm|mp4|mov|m4v)$/.test(ext) ? ext : '.webm';
+  const path = `${folder}/${ballId}${normalizedExt}`;
   let url = '';
   let ok = false;
   if (isSupabaseConfigured) {
@@ -228,7 +253,7 @@ export async function uploadClip(
       const client = createClient();
       const { data, error } = await client.storage
         .from(CLIPS_BUCKET)
-        .upload(path, blob, { contentType: blob.type || 'video/webm', upsert: true });
+        .upload(path, blob, { contentType: blob.type || `video/${normalizedExt.slice(1)}`, upsert: true });
       if (error) throw error;
       const signed = await client.storage.from(CLIPS_BUCKET).createSignedUrl(data.path, 3600);
       if (signed.error) throw signed.error;
@@ -244,17 +269,17 @@ export async function uploadClip(
   }
   const clip: ReviewClip = {
     ballId,
-    name: `${ballId}.webm`,
+    name,
     size: blob.size,
-    mime: blob.type || 'video/webm',
-    durationMs: metadata?.durationMs ?? 0,
+    mime: blob.type || `video/${normalizedExt.slice(1)}`,
+    durationMs: durationMs ?? 0,
     capturedAt: Date.now(),
     path,
     url,
   };
   cacheClip(clip);
   await saveClipRow(clip);
-  return { clip, ok };
+  return clip;
 }
 
 /** Fresh, playable URL for a clip — existing signed/object URL, else re-sign. */

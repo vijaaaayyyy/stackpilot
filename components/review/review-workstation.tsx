@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { AnimatePresence, motion, useReducedMotion } from 'framer-motion';
 import {
@@ -8,12 +8,14 @@ import {
   Camera,
   ChevronLeft,
   ChevronRight,
+  Loader2,
   Pause,
   Play,
   RotateCcw,
   Scale,
   ScanLine,
   ShieldAlert,
+  Sparkles,
   Video,
   X,
   ZoomIn,
@@ -27,6 +29,7 @@ import {
   IMPACT_T as BALL_IMPACT_T,
 } from '@/lib/drs/trajectory';
 import { demoService, onFieldFor, reasonFor } from '@/lib/drs/demo-service';
+import { analyzeDelivery, type DrsAnalysis } from '@/lib/drs/ai';
 import { saveReview } from '@/lib/drs/store';
 import { deleteClip, getClip, resolveClipUrl, type ReviewClip } from '@/lib/drs/clips';
 import { FootageCapture } from '@/components/review/footage-capture';
@@ -107,22 +110,30 @@ export function ReviewWorkstation({
   from = 'live',
   matchId = 'demo-live',
   matchLabel = 'Falcons vs Strikers · Hyderabad Turf League',
+  clipId,
+  standalone = false,
 }: {
   type: string;
   ball?: string;
-  from?: 'live' | 'history' | 'demo';
+  from?: 'live' | 'history' | 'demo' | 'upload';
   matchId?: string;
   matchLabel?: string;
+  /** clip index key — present when reviewing a standalone uploaded video */
+  clipId?: string;
+  /** standalone mode: no match/ball bookkeeping, review lives on its own */
+  standalone?: boolean;
 }) {
   const router = useRouter();
   const reduceMotion = useReducedMotion();
 
-  const reviewType = useMemo(() => normalizeType(type), [type]);
+  const [reviewType, setReviewType] = useState<ReviewTypeId>(() => normalizeType(type));
   const [phase, setPhase] = useState<'capture' | 'analysis' | 'reveal'>('capture');
   const [view, setView] = useState<'umpire' | 'top' | 'square'>('umpire');
   const [evidence, setEvidence] = useState<ReviewEvidence | null>(null);
-  const [decision, setDecision] = useState<Decision>(DEFAULT_DECISION[reviewType]);
+  const [decision, setDecision] = useState<Decision>(DEFAULT_DECISION[normalizeType(type)]);
   const [returning, setReturning] = useState(false);
+  const [analysis, setAnalysis] = useState<DrsAnalysis | null>(null);
+  const [aiStatus, setAiStatus] = useState<'idle' | 'analyzing' | 'done'>('idle');
 
   const [progress, setProgress] = useState(0);
   const [playing, setPlaying] = useState(true);
@@ -147,25 +158,77 @@ export function ReviewWorkstation({
   const isLbw = reviewType === 'lbw';
   const isCaught = reviewType === 'caught';
 
-  /* Load evidence through the service (real CV plugs in here later). */
+  const isStandalone = standalone && Boolean(clipId);
+  const clipKey = isStandalone ? (clipId as string) : ball;
+  const evidenceMatchId = isStandalone ? 'standalone' : matchId;
+
+  /* Load evidence: AI analysis of the clip when it lives in the storage bucket,
+     simulated evidence otherwise. Never blocks the review either way. */
   useEffect(() => {
     let active = true;
-    demoService
-      .requestEvidence({ matchId, ballId: ball, type: reviewType })
-      .then((result) => {
-        if (active) setEvidence(result);
-      });
+    async function load() {
+      setAiStatus('analyzing');
+      try {
+        let result: DrsAnalysis | null = null;
+        if (clip?.path && matchId) {
+          try {
+            result = await analyzeDelivery({
+              matchId: evidenceMatchId,
+              ballId: clipKey,
+              type: reviewType,
+              clipPath: clip.path,
+            });
+          } catch {
+            result = null;
+          }
+        }
+        if (!active) return;
+        if (result) {
+          setAnalysis(result);
+          setEvidence(result.evidence);
+        } else {
+          setAnalysis(null);
+          const ev = await demoService.requestEvidence({
+            matchId: evidenceMatchId,
+            ballId: clipKey,
+            type: reviewType,
+          });
+          if (active) setEvidence(ev);
+        }
+      } finally {
+        if (active) setAiStatus('done');
+      }
+    }
+    void load();
     return () => {
       active = false;
     };
-  }, [reviewType, ball, matchId]);
+  }, [reviewType, ball, matchId, clipKey, evidenceMatchId, clip?.path]);
 
-  /* Phone footage clip for this ball — read from the local index + listen for changes */
+  /* Standalone: picking another review type resets the replay cleanly. */
   useEffect(() => {
-    setClip(getClip(ball));
-    const onChange = () => setClip(getClip(ball));
+    if (!isStandalone) return;
+    slowTriggeredRef.current = false;
+    autoRef.current = true;
+    analysisPendingRef.current = false;
+    setDecision(DEFAULT_DECISION[reviewType]);
+    setPhase('capture');
+    setView('umpire');
+    setOverlays(false);
+    setZoom(1);
+    setSpeed(1);
+    progressRef.current = 0;
+    setProgress(0);
+    setPlaying(true);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isStandalone, reviewType]);
+
+  /* Phone footage clip for this ball/clip — read from the local index + listen for changes */
+  useEffect(() => {
+    setClip(getClip(clipKey));
+    const onChange = () => setClip(getClip(clipKey));
     const onDetach = () => {
-      deleteClip(ball);
+      deleteClip(clipKey);
       setClip(null);
     };
     window.addEventListener('turf-drs:clips-changed', onChange);
@@ -174,7 +237,7 @@ export function ReviewWorkstation({
       window.removeEventListener('turf-drs:clips-changed', onChange);
       window.removeEventListener('turf-drs:clip-detached', onDetach);
     };
-  }, [ball]);
+  }, [clipKey]);
 
   /* Resolve a playable URL for the private bucket (re-signs once expired). */
   useEffect(() => {
@@ -394,6 +457,7 @@ export function ReviewWorkstation({
 
   const handleExit = () => {
     if (from === 'history') router.replace('/reviews');
+    else if (isStandalone) router.replace('/review');
     else router.replace('/live');
   };
 
@@ -403,8 +467,8 @@ export function ReviewWorkstation({
     let review: Review | null = null;
     try {
       review = await demoService.finalizeReview({
-        matchId,
-        ballId: ball,
+        matchId: evidenceMatchId,
+        ballId: clipKey,
         type: reviewType,
         decision,
         onField: onFieldFor(reviewType),
@@ -420,6 +484,7 @@ export function ReviewWorkstation({
       /* still navigate so the user is never stranded */
     }
     if (from === 'history') router.replace('/reviews');
+    else if (isStandalone) router.replace('/review');
     else if (review) {
       router.replace(`/live?review=${decision}&status=${review.status}&ball=${ball}`);
     } else {
@@ -500,9 +565,9 @@ export function ReviewWorkstation({
           <p className="truncate font-mono text-[11px] font-semibold uppercase tracking-[0.18em] text-amber-300 sm:text-xs">
             Third Umpire Review
             <span className="mx-2 text-white/25">•</span>
-            <span className="text-white/80">Falcons vs Strikers</span>
+            <span className="text-white/80">{isStandalone ? 'Standalone review' : 'Falcons vs Strikers'}</span>
             <span className="mx-2 text-white/25">•</span>
-            <span className="text-cyan-300">{ball}</span>
+            <span className="text-cyan-300">{isStandalone ? 'UPLOADED CLIP' : ball}</span>
             <span className="mx-2 text-white/25">•</span>
             <span className="text-white/80">{label}</span>
           </p>
@@ -663,6 +728,18 @@ export function ReviewWorkstation({
                     Frame Analysis
                   </p>
                   <h3 className="mt-1.5 text-base font-semibold tracking-tight text-foreground">{label}</h3>
+                  {aiStatus === 'analyzing' && (
+                    <span className="mt-1.5 inline-flex items-center gap-1.5 rounded-full bg-amber-400/10 px-2.5 py-1 font-mono text-[9px] font-semibold uppercase tracking-widest text-amber-300 ring-1 ring-amber-400/25">
+                      <Loader2 className="h-3 w-3 animate-spin" />
+                      Analyzing clip…
+                    </span>
+                  )}
+                  {aiStatus === 'done' && analysis?.analyzedBy === 'ai' && (
+                    <span className="mt-1.5 inline-flex items-center gap-1.5 rounded-full bg-emerald-400/10 px-2.5 py-1 font-mono text-[9px] font-semibold uppercase tracking-widest text-emerald-300 ring-1 ring-emerald-400/25">
+                      <Sparkles className="h-3 w-3" />
+                      AI · {(analysis.model ?? 'gemini').replace(/^gemini-/, '').split('-').join(' ')}
+                    </span>
+                  )}
                   <p className="mt-1 text-xs text-white/55">
                     {reviewType === 'lbw' && 'Pitching line and wicket projection from the top-down camera.'}
                     {reviewType === 'caught' && 'Contact frame checked against the audio spike.'}
@@ -670,6 +747,33 @@ export function ReviewWorkstation({
                     {reviewType === 'stumping' && 'Keeper gather timed against bat grounding.'}
                     {reviewType === 'boundary' && 'Rope contact checked from the rope camera.'}
                   </p>
+
+                  {/* Review type — standalone uploaded reviews are not tied to a match */}
+                  {isStandalone && scope === 'capture' && (
+                    <div className="mt-3">
+                      <p className="font-mono text-[10px] font-semibold uppercase tracking-[0.24em] text-white/45">
+                        Review type
+                      </p>
+                      <div className="mt-2 flex flex-wrap gap-1.5">
+                        {(['lbw', 'caught', 'runout', 'stumping', 'boundary'] as ReviewTypeId[]).map((t) => (
+                          <button
+                            key={t}
+                            type="button"
+                            onClick={() => setReviewType(t)}
+                            aria-pressed={reviewType === t}
+                            className={cn(
+                              'rounded-full border px-2.5 py-1 font-mono text-[10px] font-semibold uppercase tracking-widest transition-colors',
+                              reviewType === t
+                                ? 'border-amber-400/40 bg-amber-400/15 text-amber-300'
+                                : 'border-white/10 text-white/50 hover:text-white',
+                            )}
+                          >
+                            {t === 'runout' ? 'Run Out' : t}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  )}
                 </div>
 
                 {/* Live capture indicator */}
@@ -706,6 +810,14 @@ export function ReviewWorkstation({
                 {/* Findings */}
                 {scope === 'analysis' && (
                   <div className="space-y-2">
+                    {aiStatus === 'analyzing' && (
+                      <div className="flex items-center gap-2 rounded-xl border border-amber-400/20 bg-amber-400/[0.05] px-3 py-2.5">
+                        <Loader2 className="h-3.5 w-3.5 animate-spin text-amber-300" />
+                        <span className="font-mono text-[10px] uppercase tracking-widest text-amber-200/80">
+                          AI analyzing clip…
+                        </span>
+                      </div>
+                    )}
                     {(evidence?.findings ?? []).map((finding) => {
                       const tone =
                         finding.tone === 'good'
@@ -991,6 +1103,28 @@ export function ReviewWorkstation({
             </button>
           )}
 
+          {/* Review type — standalone (mobile/tablet) */}
+          {isStandalone && phase === 'capture' && (
+            <div className="flex flex-wrap items-center justify-center gap-1.5">
+              {(['lbw', 'caught', 'runout', 'stumping', 'boundary'] as ReviewTypeId[]).map((t) => (
+                <button
+                  key={t}
+                  type="button"
+                  onClick={() => setReviewType(t)}
+                  aria-pressed={reviewType === t}
+                  className={cn(
+                    'rounded-full border px-2.5 py-1.5 font-mono text-[10px] font-semibold uppercase tracking-widest transition-colors',
+                    reviewType === t
+                      ? 'border-amber-400/40 bg-amber-400/15 text-amber-300'
+                      : 'border-white/10 text-white/50 hover:text-white',
+                  )}
+                >
+                  {t === 'runout' ? 'Run Out' : t}
+                </button>
+              ))}
+            </div>
+          )}
+
           {/* Decision note */}
           {phase === 'capture' && decision && (
             <div className="ml-1 flex items-center gap-2 rounded-xl border border-amber-400/25 bg-amber-400/[0.06] px-3.5 py-2">
@@ -1035,7 +1169,9 @@ export function ReviewWorkstation({
       {phase === 'reveal' && evidence && (
         <div className="relative z-20 shrink-0 border-t border-white/10 bg-[#0a0e16] px-4 py-3 text-center">
           <span className="font-mono text-[10px] font-medium uppercase tracking-widest text-white/50 sm:text-[11px]">
-            {reasonFor(reviewType, decision)}
+            {analysis?.analyzedBy === 'ai' && analysis?.reason
+              ? analysis.reason
+              : reasonFor(reviewType, decision)}
           </span>
         </div>
       )}

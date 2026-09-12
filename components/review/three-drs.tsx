@@ -1,8 +1,9 @@
 'use client';
 
 /* Three.js 3D DRS replay — pitch, stumps, clear ball, trajectory, impact
-   marker and projected wicket line. Two fixed cameras (Umpire Cam / Top Cam).
-   Raw three.js, no render helpers, so the worker stays light. */
+   marker, projected wicket line and the "pitched in line" corridor. Two fixed
+   cameras (Umpire Cam / Top Cam). Raw three.js, no render helpers, so the
+   worker stays light. */
 
 import { useEffect, useRef } from 'react';
 import * as THREE from 'three';
@@ -26,6 +27,11 @@ const PITCH_WIDTH = 2.4;
 const STUMP_Z = 4.35;
 const STUMP_HEIGHT = 0.71;
 const CREASE_Z = 3.95;
+
+/* "Pitched in line" corridor — the zone between the two sets of stumps. The
+   two rails sit just outside the outer stumps (stump spread is 0.22), so the
+   band reads as "between the stumps". */
+const CORRIDOR_HALF = 0.16;
 
 /* World mapping for the shared 2D trajectory -> 3D pitch space. The umpire-end
    plot travels "away from camera" = from bowler (z-) to batter (z+). */
@@ -99,19 +105,22 @@ export function ThreeDrsScene({
   view,
   overlays,
   verdict = 'hitting',
+  offSide = 1,
 }: {
   type: string;
   progress: number;
   view: DrsView;
   overlays: boolean;
   verdict?: 'hitting' | 'missing';
+  /** Which world-X direction is the batter's off side. 1 = +x, -1 = -x. */
+  offSide?: 1 | -1;
 }) {
   const containerRef = useRef<HTMLDivElement | null>(null);
   const impactChipRef = useRef<HTMLDivElement | null>(null);
   const wicketChipRef = useRef<HTMLDivElement | null>(null);
 
-  const stateRef = useRef({ type, progress, view, overlays, verdict });
-  stateRef.current = { type, progress, view, overlays, verdict };
+  const stateRef = useRef({ type, progress, view, overlays, verdict, offSide });
+  stateRef.current = { type, progress, view, overlays, verdict, offSide };
 
   const initRef = useRef(false);
 
@@ -209,6 +218,40 @@ export function ThreeDrsScene({
     returnLine(-CREASE_Z, PITCH_WIDTH * 0.5, PITCH_WIDTH * 0.52);
     returnLine(CREASE_Z, -PITCH_WIDTH * 0.5, -PITCH_WIDTH * 0.52);
     returnLine(CREASE_Z, PITCH_WIDTH * 0.5, PITCH_WIDTH * 0.52);
+
+    /* -------- "Pitched in line" corridor: rails + shaded band -------- */
+    const corridorGroup = new THREE.Group();
+    const corridorMat = new THREE.MeshBasicMaterial({
+      color: 0x7cf29c,
+      transparent: true,
+      opacity: 0.95,
+      depthWrite: false,
+    });
+    [-CORRIDOR_HALF, CORRIDOR_HALF].forEach((x) => {
+      const rail = new THREE.Mesh(new THREE.BoxGeometry(0.045, 0.018, 2 * STUMP_Z), corridorMat);
+      rail.position.set(x, 0.015, 0);
+      corridorGroup.add(rail);
+    });
+    const corridorBand = new THREE.Mesh(
+      new THREE.PlaneGeometry(2 * CORRIDOR_HALF, 2 * STUMP_Z),
+      new THREE.MeshBasicMaterial({
+        color: 0x7cf29c,
+        transparent: true,
+        opacity: 0.13,
+        side: THREE.DoubleSide,
+        depthWrite: false,
+      }),
+    );
+    corridorBand.rotation.x = -Math.PI / 2;
+    corridorBand.position.set(0, 0.012, 0);
+    corridorGroup.add(corridorBand);
+    [CREASE_Z, -CREASE_Z].forEach((z) => {
+      const gate = new THREE.Mesh(new THREE.BoxGeometry(2 * CORRIDOR_HALF, 0.012, 0.02), corridorMat);
+      gate.position.set(0, 0.014, z);
+      corridorGroup.add(gate);
+    });
+    corridorGroup.visible = false;
+    scene.add(corridorGroup);
 
     /* Stumps at both ends */
     const bowlerStumps = makeStumps();
@@ -348,6 +391,9 @@ export function ThreeDrsScene({
       const pitched = s.progress >= BOUNCE_T;
       const atImpact = s.progress >= IMPACT_T;
 
+      /* Corridor is LBW context only */
+      corridorGroup.visible = s.type === 'lbw';
+
       /* Camera transition — snaps on the first frame, then eases between rigs */
       setViewTarget(s.view);
       if (transitionT >= 1) {
@@ -411,7 +457,27 @@ export function ThreeDrsScene({
       });
 
       /* HTML overlay chips — project world points into screen space */
-      updateChip(impactChipRef.current, bounceWorld(), pitched && s.type === 'lbw', camera, container, tmpScreen);
+      const impactWorld = bounceWorld();
+      const impactX = impactWorld.x;
+      const inside = Math.abs(impactX) <= CORRIDOR_HALF;
+      const impactState: 'in' | 'off' | 'leg' = inside
+        ? 'in'
+        : s.offSide > 0
+          ? impactX > 0
+            ? 'off'
+            : 'leg'
+          : impactX < 0
+            ? 'off'
+            : 'leg';
+      updateChip(
+        impactChipRef.current,
+        impactWorld,
+        pitched && s.type === 'lbw',
+        camera,
+        container,
+        tmpScreen,
+        impactState,
+      );
       updateChip(wicketChipRef.current, new THREE.Vector3(toWorldX(STUMP_HIT.x), 1.05, STUMP_Z - 0.12), showProjection, camera, container, tmpScreen);
 
       renderer!.render(scene, camera);
@@ -465,9 +531,10 @@ export function ThreeDrsScene({
       </noscript>
 
       {/* Overlay chips (positioned by the render loop) */}
+      {/* Impact chip — "in line" state is set by the render loop */}
       <div
         ref={impactChipRef}
-        className="pointer-events-none absolute z-10 -translate-x-1/2 translate-y-2 rounded bg-black/75 px-2 py-0.5 font-mono text-[10px] font-semibold uppercase tracking-wider text-[#9ef7e8] ring-1 ring-teal-400/40"
+        className="pointer-events-none absolute z-10 -translate-x-1/2 translate-y-2 rounded bg-black/75 px-2 py-0.5 font-mono text-[10px] font-semibold uppercase tracking-wider"
         style={{ visibility: 'hidden' }}
       >
         IMPACT · IN LINE
@@ -504,6 +571,7 @@ function updateChip(
   camera: THREE.Camera,
   container: HTMLDivElement,
   tmp: THREE.Vector3,
+  impact?: 'in' | 'off' | 'leg',
 ): void {
   if (!chip) return;
   if (!visible) {
@@ -522,4 +590,16 @@ function updateChip(
   chip.style.visibility = 'visible';
   chip.style.left = `${x.toFixed(0)}px`;
   chip.style.top = `${y.toFixed(0)}px`;
+  if (impact) {
+    const inLine = impact === 'in';
+    chip.textContent = inLine
+      ? 'IMPACT · IN LINE'
+      : impact === 'off'
+        ? 'IMPACT · OUTSIDE OFF'
+        : 'IMPACT · OUTSIDE LEG';
+    chip.style.color = inLine ? '#9ef7e8' : '#fcd34d';
+    chip.style.boxShadow = inLine
+      ? 'inset 0 0 0 1px rgba(94,234,212,0.45)'
+      : 'inset 0 0 0 1px rgba(252,211,77,0.55)';
+  }
 }

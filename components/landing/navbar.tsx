@@ -7,6 +7,7 @@ import { Menu, X, Sparkles, UserRound, Settings2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { ThemeSwitcher } from '@/components/landing/theme-switcher';
 import { TurfLogo } from '@/components/landing/brand-logo';
+import { UserAvatar } from '@/components/ui/user-avatar';
 import { useAuth } from '@/lib/auth/auth-context';
 import {
   DropdownMenu,
@@ -73,11 +74,7 @@ export function Navbar() {
   const displayName =
     user?.user_metadata?.name ?? user?.email?.split('@')[0] ?? 'Account';
 
-  const avatar = (
-    <span className="flex h-8 w-8 items-center justify-center rounded-full bg-teal-500 text-xs font-bold text-white">
-      {displayName.charAt(0).toUpperCase()}
-    </span>
-  );
+  const avatar = <UserAvatar user={user} className="h-8 w-8 rounded-full text-xs" />;
 
   useEffect(() => {
     const onScroll = () => setScrolled(window.scrollY > 16);

@@ -6,19 +6,13 @@ import { AnimatePresence, motion, useReducedMotion } from 'framer-motion';
 import { ArrowRight } from 'lucide-react';
 import { TurfLogo } from '@/components/landing/brand-logo';
 import { useAuth } from '@/lib/auth/auth-context';
+import { getProfileAvatar, getProfileInitials, getProfileName } from '@/lib/auth/profile';
 
 const PROVIDER_LABEL: Record<string, string> = {
   github: 'GitHub',
   google: 'Google',
   email: 'Email',
 };
-
-/** Pulls the profile photo provided by the auth provider (GitHub/Google/email). */
-function providerAvatar(user: { user_metadata?: Record<string, unknown> } | null): string | null {
-  const meta = user?.user_metadata ?? {};
-  const url = meta.avatar_url ?? meta.picture ?? meta.avatar;
-  return typeof url === 'string' && url.startsWith('http') ? url : null;
-}
 
 /**
  * Grok-style "connected" pulse shown right after sign-in (email or OAuth).
@@ -38,15 +32,9 @@ export function ConnectedPulse({
   const reduce = useReducedMotion();
   const [stage, setStage] = useState<'pulse' | 'text' | 'actions'>('pulse');
 
-  const avatar = providerAvatar(user);
-  const fullName = typeof user?.user_metadata?.name === 'string' ? user.user_metadata.name : (user?.email ?? '');
-  const initials = fullName
-    .split(/\s+/)
-    .map((part) => part[0])
-    .filter(Boolean)
-    .slice(0, 2)
-    .join('')
-    .toUpperCase();
+  const avatar = getProfileAvatar(user);
+  const fullName = getProfileName(user);
+  const initials = getProfileInitials(user);
   const provider = typeof user?.app_metadata?.provider === 'string' ? user.app_metadata.provider : 'email';
   const providerLabel = PROVIDER_LABEL[provider] ?? provider;
 

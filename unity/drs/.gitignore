@@ -1,0 +1,15 @@
+# Unity artifacts
+[Ll]ibrary/
+[Tt]emp/
+[Oo]bj/
+[Bb]uild/
+[Ll]ogs/
+UserSettings/
+MemoryCaptures/
+*.csproj
+*.sln
+*.user
+
+# Generated scene + WebGL output produce these paths
+Assets/Scenes/
+BuildWebGL/

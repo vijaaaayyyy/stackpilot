@@ -5,6 +5,9 @@ import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { Check, Loader2, LogOut, Sparkles } from 'lucide-react';
 import { useAuth } from '@/lib/auth/auth-context';
+import { getProfileAvatar, getProfileName } from '@/lib/auth/profile';
+import { UserAvatar } from '@/components/ui/user-avatar';
+import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -34,12 +37,9 @@ export default function AccountPage() {
     );
   }
 
-  const fullName =
-    (user.user_metadata?.full_name as string | undefined) ??
-    (user.user_metadata?.name as string | undefined) ??
-    '';
+  const fullName = getProfileName(user);
   const displayName = fullName || user.email?.split('@')[0] || 'User';
-  const initial = displayName.charAt(0).toUpperCase();
+  const hasAvatar = !!getProfileAvatar(user);
   const emailVerified = !!user.email_confirmed_at;
 
   const onSignOut = async () => {
@@ -88,9 +88,10 @@ export default function AccountPage() {
         <div className="mt-8 space-y-6">
           <section className="glass rounded-2xl p-6">
             <div className="flex items-center gap-4">
-              <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-teal-500 text-2xl font-bold text-white shadow-lg">
-                {initial}
-              </div>
+              <UserAvatar
+                user={user}
+                className={cn('h-16 w-16 rounded-2xl text-2xl', hasAvatar && 'ring-2 ring-teal-400/30')}
+              />
               <div className="min-w-0">
                 <h2 className="truncate text-lg font-semibold text-foreground">
                   {displayName || 'Turf DRS user'}

@@ -34,8 +34,8 @@ import { FootagePlayer } from '@/components/review/footage-player';
 import type { Decision, Review, ReviewEvidence, ReviewTypeId } from '@/lib/drs/types';
 import { cn } from '@/lib/utils';
 
-const ThreeDrsScene = dynamic(
-  () => import('@/components/review/three-drs').then((module) => module.ThreeDrsScene),
+const DrsScene = dynamic(
+  () => import('@/components/review/drs-scene').then((module) => module.DrsScene),
   {
     ssr: false,
     loading: () => (
@@ -539,11 +539,12 @@ export function ReviewWorkstation({
                 }}
               >
                 <div className="w-full max-w-5xl px-4">
-                  <ThreeDrsScene
+                  <DrsScene
                     type={reviewType}
                     progress={progress}
                     view={view}
                     overlays={overlays}
+                    zoom={zoom}
                   />
                 </div>
               </div>

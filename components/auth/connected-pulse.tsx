@@ -5,6 +5,20 @@ import { useRouter } from 'next/navigation';
 import { AnimatePresence, motion, useReducedMotion } from 'framer-motion';
 import { ArrowRight } from 'lucide-react';
 import { TurfLogo } from '@/components/landing/brand-logo';
+import { useAuth } from '@/lib/auth/auth-context';
+
+const PROVIDER_LABEL: Record<string, string> = {
+  github: 'GitHub',
+  google: 'Google',
+  email: 'Email',
+};
+
+/** Pulls the profile photo provided by the auth provider (GitHub/Google/email). */
+function providerAvatar(user: { user_metadata?: Record<string, unknown> } | null): string | null {
+  const meta = user?.user_metadata ?? {};
+  const url = meta.avatar_url ?? meta.picture ?? meta.avatar;
+  return typeof url === 'string' && url.startsWith('http') ? url : null;
+}
 
 /**
  * Grok-style "connected" pulse shown right after sign-in (email or OAuth).
@@ -20,8 +34,21 @@ export function ConnectedPulse({
   autoAdvanceMs?: number;
 }) {
   const router = useRouter();
+  const { user } = useAuth();
   const reduce = useReducedMotion();
   const [stage, setStage] = useState<'pulse' | 'text' | 'actions'>('pulse');
+
+  const avatar = providerAvatar(user);
+  const fullName = typeof user?.user_metadata?.name === 'string' ? user.user_metadata.name : (user?.email ?? '');
+  const initials = fullName
+    .split(/\s+/)
+    .map((part) => part[0])
+    .filter(Boolean)
+    .slice(0, 2)
+    .join('')
+    .toUpperCase();
+  const provider = typeof user?.app_metadata?.provider === 'string' ? user.app_metadata.provider : 'email';
+  const providerLabel = PROVIDER_LABEL[provider] ?? provider;
 
   const destination = useMemo(() => (next.startsWith('/') && !next.startsWith('//') ? next : '/dashboard'), [next]);
   const continueLabel = useMemo(() => {
@@ -64,37 +91,49 @@ export function ConnectedPulse({
         {/* Soft top glow */}
         <div aria-hidden="true" className="pointer-events-none absolute inset-x-0 top-0 h-40 bg-gradient-to-b from-teal-400/[0.07] to-transparent" />
 
-        {/* Pulsing mark */}
-        <div className="relative flex h-24 w-24 items-center justify-center">
-          {/* Ambient pulse glow */}
-          <motion.div
-            aria-hidden="true"
-            initial={{ opacity: 0, scale: 0.6 }}
-            animate={{ opacity: [0.5, 0.9, 0.5], scale: [0.95, 1.05, 0.95] }}
-            transition={{ duration: 2.2, repeat: Infinity, ease: 'easeInOut' }}
-            className="absolute -inset-3 rounded-full"
-            style={{
-              background: 'radial-gradient(circle, rgba(45,212,191,0.28) 0%, transparent 68%)',
-              filter: 'blur(6px)',
-            }}
-          />
-          {/* Expanding ring */}
-          <motion.div
-            aria-hidden="true"
-            initial={{ scale: 0.8, opacity: 0.7 }}
-            animate={{ scale: [0.9, 1.5, 1.9], opacity: [0.6, 0.25, 0] }}
-            transition={{ duration: 1.9, repeat: Infinity, ease: 'easeOut' }}
-            className="absolute h-20 w-20 rounded-full border border-teal-300/50"
-          />
-          <motion.div
-            initial={reduce ? false : { scale: 0.5, opacity: 0 }}
-            animate={{ scale: 1, opacity: 1 }}
-            transition={{ delay: 0.1, type: 'spring', stiffness: 220, damping: 16 }}
-            className="flex h-20 w-20 items-center justify-center rounded-2xl border border-teal-400/30 bg-teal-400/10 shadow-[0_0_48px_rgba(45,212,191,0.3)]"
-          >
-            <TurfLogo className="h-10 w-10 text-teal-300" />
-          </motion.div>
-        </div>
+{/* Pulsing mark */}
+          <div className="relative flex h-24 w-24 items-center justify-center">
+            {/* Ambient pulse glow */}
+            <motion.div
+              aria-hidden="true"
+              initial={{ opacity: 0, scale: 0.6 }}
+              animate={{ opacity: [0.5, 0.9, 0.5], scale: [0.95, 1.05, 0.95] }}
+              transition={{ duration: 2.2, repeat: Infinity, ease: 'easeInOut' }}
+              className="absolute -inset-3 rounded-full"
+              style={{
+                background: 'radial-gradient(circle, rgba(45,212,191,0.28) 0%, transparent 68%)',
+                filter: 'blur(6px)',
+              }}
+            />
+            {/* Expanding ring */}
+            <motion.div
+              aria-hidden="true"
+              initial={{ scale: 0.8, opacity: 0.7 }}
+              animate={{ scale: [0.9, 1.5, 1.9], opacity: [0.6, 0.25, 0] }}
+              transition={{ duration: 1.9, repeat: Infinity, ease: 'easeOut' }}
+              className="absolute h-20 w-20 rounded-full border border-teal-300/50"
+            />
+            <motion.div
+              initial={reduce ? false : { scale: 0.5, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              transition={{ delay: 0.1, type: 'spring', stiffness: 220, damping: 16 }}
+              className="flex h-20 w-20 items-center justify-center overflow-hidden rounded-2xl border border-teal-400/30 bg-teal-400/10 shadow-[0_0_48px_rgba(45,212,191,0.3)]"
+            >
+              {avatar ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img
+                  src={avatar}
+                  alt={fullName || 'Profile photo'}
+                  className="h-full w-full object-cover"
+                  referrerPolicy="no-referrer"
+                />
+              ) : initials ? (
+                <span className="font-mono text-2xl font-bold text-teal-300">{initials}</span>
+              ) : (
+                <TurfLogo className="h-10 w-10 text-teal-300" />
+              )}
+            </motion.div>
+          </div>
 
         {/* Confirmation text */}
         <AnimatePresence>
@@ -116,6 +155,17 @@ export function ConnectedPulse({
               >
                 Turf DRS is ready — matches, third-umpire reviews and slow-mo footage are waiting for you.
               </motion.p>
+              <motion.div
+                initial={{ opacity: 0, scale: 0.94 }}
+                animate={{ opacity: 1, scale: 1 }}
+                transition={{ delay: 0.3, duration: 0.4, ease: 'easeOut' }}
+                className="mt-4 inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/[0.04] px-3.5 py-1.5 font-mono text-[10px] uppercase tracking-[0.18em] text-white/50"
+              >
+                <span className="h-1.5 w-1.5 rounded-full bg-teal-400" />
+                {providerLabel}
+                <span className="text-white/30">·</span>
+                <span className="normal-case tracking-normal text-white/70">{user?.email ?? fullName}</span>
+              </motion.div>
             </div>
           )}
         </AnimatePresence>

@@ -33,6 +33,7 @@ const publicNavLinks: NavLink[] = [
 ];
 
 const appNavLinks: NavLink[] = [
+  { label: 'Home', href: '/', pattern: '/' },
   { label: 'Dashboard', href: '/dashboard', pattern: '/dashboard' },
   { label: 'Matches', href: '/matches', pattern: '/matches' },
   { label: 'Live', href: '/live', pattern: '/live' },
@@ -150,6 +151,11 @@ export function Navbar() {
               <DropdownMenuContent align="end" className="w-56">
                 <DropdownMenuLabel className="truncate">{user.email}</DropdownMenuLabel>
                 <DropdownMenuSeparator />
+                <DropdownMenuItem asChild>
+                  <Link href="/" className="gap-2">
+                    <Sparkles className="h-4 w-4" /> Home
+                  </Link>
+                </DropdownMenuItem>
                 <DropdownMenuItem asChild>
                   <Link href="/dashboard" className="gap-2">
                     <Sparkles className="h-4 w-4" /> Dashboard

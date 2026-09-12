@@ -8,16 +8,16 @@ import {
   useScroll,
   useTransform,
 } from 'framer-motion';
-import { PencilLine, Cpu, Layers } from 'lucide-react';
+import { BadgeCheck, Camera, Clapperboard, RefreshCcw } from 'lucide-react';
 import { Reveal } from '@/components/ui/reveal';
 
 const steps = [
   {
     number: '01',
-    icon: PencilLine,
-    title: 'Describe your project',
+    icon: Camera,
+    title: 'Camera',
     description:
-      'Tell Stack2Set what you want to build. A YouTube clone, a Spotify-like app, an AI chatbot — anything.',
+      'Place a camera at the umpire\u2019s end with a clear, level view of the pitch and the stumps.',
     iconBox: 'from-purple-500/25 to-fuchsia-500/10 ring-purple-500/25',
     iconColor: 'text-purple-300',
     labelColor: 'text-purple-400/80',
@@ -26,10 +26,10 @@ const steps = [
   },
   {
     number: '02',
-    icon: Cpu,
-    title: 'AI identifies required categories',
+    icon: Clapperboard,
+    title: 'Record',
     description:
-      'Our AI analyzes your idea and identifies every technology category your project needs — from databases to payments.',
+      'Every delivery is captured automatically \u2014 no camera operator, no missed moments, no debate.',
     iconBox: 'from-cyan-500/25 to-teal-500/10 ring-cyan-500/25',
     iconColor: 'text-cyan-300',
     labelColor: 'text-cyan-400/80',
@@ -38,10 +38,22 @@ const steps = [
   },
   {
     number: '03',
-    icon: Layers,
-    title: 'Choose providers & build your stack',
+    icon: RefreshCcw,
+    title: 'Review',
     description:
-      'Browse recommended providers for each category, compare them, and assemble your perfect tech stack.',
+      'The on-field umpire signals for a third-umpire review with a single tap on your phone.',
+    iconBox: 'from-amber-500/25 to-orange-500/10 ring-amber-500/25',
+    iconColor: 'text-amber-300',
+    labelColor: 'text-amber-400/80',
+    mobileLine: 'from-amber-500/60',
+    rgb: '251, 191, 36',
+  },
+  {
+    number: '04',
+    icon: BadgeCheck,
+    title: 'Decide',
+    description:
+      'Slow-mo, frame-by-frame, and ball tracking come together for one fair, final decision.',
     iconBox: 'from-emerald-500/25 to-green-500/10 ring-emerald-500/25',
     iconColor: 'text-emerald-300',
     labelColor: 'text-emerald-400/80',
@@ -115,26 +127,27 @@ export function HowItWorks() {
           <div className="mx-auto max-w-2xl text-center">
             <p className="text-sm font-medium text-teal-400">How It Works</p>
             <h2 className="mt-3 text-balance text-3xl font-semibold tracking-tight text-foreground sm:text-5xl">
-              From idea to stack in <span className="gradient-text">three steps</span>
+              From delivery to decision in <span className="gradient-text">four steps</span>
             </h2>
             <p className="mt-4 text-base text-muted-foreground sm:text-lg">
-              No more endless research. Describe what you want to build and let AI do the heavy
-              lifting.
+              Local cricket deserves professional reviews. Here&apos;s how Turf DRS makes every
+              close call count.
             </p>
           </div>
         </Reveal>
 
-        <div ref={sectionRef} className="relative mt-16 grid gap-12 md:grid-cols-3 md:gap-6">
+        <div ref={sectionRef} className="relative mt-16 grid gap-12 md:grid-cols-4 md:gap-6">
           {/* Scroll-linked connecting trail (desktop) */}
           <div
             aria-hidden="true"
-            className="pointer-events-none absolute inset-x-[14%] top-14 hidden md:block"
+            className="pointer-events-none absolute inset-x-[8%] top-14 hidden md:block"
           >
             <svg className="h-4 w-full" viewBox="0 0 100 4" preserveAspectRatio="none">
               <defs>
                 <linearGradient id="cinema-trail" x1="0" y1="0" x2="1" y2="0">
                   <stop offset="0%" stopColor="rgba(168, 85, 247, 0.8)" />
-                  <stop offset="50%" stopColor="rgba(34, 211, 238, 0.8)" />
+                  <stop offset="33%" stopColor="rgba(34, 211, 238, 0.8)" />
+                  <stop offset="66%" stopColor="rgba(251, 191, 36, 0.8)" />
                   <stop offset="100%" stopColor="rgba(52, 211, 153, 0.8)" />
                 </linearGradient>
               </defs>

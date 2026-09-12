@@ -69,19 +69,17 @@ export function usePauseWhenHidden(): boolean {
 }
 
 /**
- * Section-level reveal: content starts mostly dark and is progressively lit as
- * the block scrolls into view. Prefers a continuous light over per-card fades.
+ * Section-level reveal: content fades and rises as the block scrolls into view.
+ * Uses only opacity + a soft lift — no filter, so neighbouring sections (and
+ * their glow overlays) never get clipped into hard-edged bands.
  */
 export function LightReveal({
   children,
   className,
-  darkness = 0.22,
   distance = 26,
 }: {
   children: ReactNode;
   className?: string;
-  /** Brightness at the very start of the reveal (0..1). */
-  darkness?: number;
   /** Vertical travel (px) while emerging. */
   distance?: number;
 }) {
@@ -91,16 +89,11 @@ export function LightReveal({
     target: ref,
     offset: ['start 0.92', 'start 0.45'],
   });
-  const opacity = useTransform(scrollYProgress, [0, 0.5, 1], [0, 0.45, 1]);
-  const y = useTransform(scrollYProgress, [0, 1], [distance, 0]);
-  const filter = useTransform(
-    scrollYProgress,
-    [0, 1],
-    [`brightness(${darkness}) blur(5px)`, 'brightness(1) blur(0px)'],
-  );
+  const opacity = useTransform(scrollYProgress, [0, 0.45, 1], [0, 0.5, 1]);
+  const y = useTransform(scrollYProgress, [0, 1], [distance * 0.6, 0]);
 
   return (
-    <motion.div ref={ref} className={className} style={reduceMotion ? undefined : { opacity, y, filter }}>
+    <motion.div ref={ref} className={className} style={reduceMotion ? undefined : { opacity, y }}>
       {children}
     </motion.div>
   );

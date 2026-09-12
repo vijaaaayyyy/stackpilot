@@ -2,77 +2,77 @@
 
 import { motion, useReducedMotion } from 'framer-motion';
 import {
-  Brain,
-  Plug,
-  Database,
-  ShieldCheck,
-  HardDrive,
-  Blocks,
-  GitCompare,
-  Bookmark,
+  Crosshair,
+  Flag,
+  Footprints,
+  Gauge,
+  Images,
+  RefreshCcw,
+  ScanLine,
+  Timer,
 } from 'lucide-react';
 
 const features = [
   {
-    icon: Brain,
-    title: 'AI Project Planner',
-    description: 'Describe your idea in plain English and get a complete project blueprint with recommended technologies.',
+    icon: RefreshCcw,
+    title: 'Instant Replay',
+    description: 'Go back on any delivery in a single tap the moment an umpire signals a review.',
     gradient: 'from-teal-500 to-cyan-500',
     iconColor: 'text-teal-300',
     tint: 'bg-teal-500/10',
   },
   {
-    icon: Plug,
-    title: 'API Discovery',
-    description: 'Find the right APIs for payments, email, search, maps, AI, and hundreds of other use cases.',
+    icon: Timer,
+    title: 'Slow Motion',
+    description: 'Replay the crucial frames at a fraction of real speed when the game blurs past.',
     gradient: 'from-blue-500 to-cyan-500',
     iconColor: 'text-blue-300',
     tint: 'bg-blue-500/10',
   },
   {
-    icon: Database,
-    title: 'Database Discovery',
-    description: 'Compare SQL, NoSQL, vector, and real-time databases to find the perfect fit for your data needs.',
+    icon: Images,
+    title: 'Frame-by-Frame',
+    description: 'Step through high-speed footage frame by frame to nail the tightest of calls.',
     gradient: 'from-emerald-500 to-teal-500',
     iconColor: 'text-emerald-300',
     tint: 'bg-emerald-500/10',
   },
   {
-    icon: ShieldCheck,
-    title: 'Authentication Discovery',
-    description: 'Explore auth providers — OAuth, magic links, biometrics — and pick the right one for your app.',
+    icon: Crosshair,
+    title: 'Ball Tracking',
+    description: 'Follow the predicted ball path for LBW decisions and see where it would have gone.',
     gradient: 'from-amber-500 to-orange-500',
     iconColor: 'text-amber-300',
     tint: 'bg-amber-500/10',
   },
   {
-    icon: HardDrive,
-    title: 'Storage Discovery',
-    description: 'Browse file and object storage solutions with pricing, limits, and feature comparisons.',
+    icon: ScanLine,
+    title: 'LBW Review',
+    description: 'Pinpoint impact and ball path to settle leg-before appeals beyond doubt.',
     gradient: 'from-pink-500 to-rose-500',
     iconColor: 'text-pink-300',
     tint: 'bg-pink-500/10',
   },
   {
-    icon: Blocks,
-    title: 'Build Stack',
-    description: 'Assemble technologies into a shareable tech stack and visualize how everything fits together.',
+    icon: Footprints,
+    title: 'Run Out Review',
+    description: 'See the exact frame the wickets were broken and who reached the crease first.',
     gradient: 'from-indigo-500 to-blue-500',
     iconColor: 'text-indigo-300',
     tint: 'bg-indigo-500/10',
   },
   {
-    icon: GitCompare,
-    title: 'Compare Providers',
-    description: 'Side-by-side comparisons of pricing, features, and performance across every category.',
-    gradient: 'from-teal-500 to-cyan-500',
+    icon: Gauge,
+    title: 'Stumping Review',
+    description: 'Time the bails falling against the keeper\u2019s glove work to freeze the verdict.',
+    gradient: 'from-fuchsia-500 to-pink-500',
     iconColor: 'text-fuchsia-300',
     tint: 'bg-fuchsia-500/10',
   },
   {
-    icon: Bookmark,
-    title: 'Save Projects',
-    description: 'Save your tech stacks and project plans, revisit them anytime, and share with your team.',
+    icon: Flag,
+    title: 'Boundary Review',
+    description: 'Check whether the ball truly crossed the rope before it was stopped.',
     gradient: 'from-cyan-500 to-sky-500',
     iconColor: 'text-cyan-300',
     tint: 'bg-cyan-500/10',
@@ -88,11 +88,11 @@ export function Features() {
         <div className="mx-auto max-w-2xl text-center">
           <p className="text-sm font-medium text-teal-400">Features</p>
           <h2 className="mt-3 text-balance text-3xl font-semibold tracking-tight text-foreground sm:text-5xl">
-            Everything you need to <span className="gradient-text">build smarter</span>
+            Reviews for every <span className="gradient-text">close call</span>
           </h2>
           <p className="mt-4 text-base text-muted-foreground sm:text-lg">
-            Powerful tools to discover, compare, and assemble the perfect technology stack for any
-            project.
+            The decision tools your spinners, umpires, and crowds will love — built for turf, club,
+            and academy cricket.
           </p>
         </div>
 

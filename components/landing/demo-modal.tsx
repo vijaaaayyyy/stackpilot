@@ -2,51 +2,49 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { AnimatePresence, motion, useReducedMotion } from 'framer-motion';
-import { Check, Cpu, Lightbulb, Sparkles, X } from 'lucide-react';
-import { categoryCssVars, getCategoryMeta } from '@/lib/categories';
+import { Camera, Check, Gauge, ScanLine, Sparkles, Video, X } from 'lucide-react';
 
 const STAGES = [
   {
-    key: 'idea',
-    eyebrow: 'Your idea',
-    title: 'I want to build a YouTube clone.',
+    key: 'capturing',
+    eyebrow: 'Capture',
+    title: 'Delivery captured at the umpire end.',
     glow: '192,132,252',
   },
   {
-    key: 'analysis',
-    eyebrow: 'AI analysis',
-    title: 'Identifying the layers your app needs…',
+    key: 'pitchmap',
+    eyebrow: 'Ball tracking',
+    title: 'Building the trajectory map…',
     glow: '167,139,250',
   },
   {
-    key: 'categories',
-    eyebrow: 'Categories',
-    title: 'Every layer of your stack',
+    key: 'analysis',
+    eyebrow: 'Review',
+    title: 'Checking impact, height, and ball path',
     glow: '34,211,238',
   },
   {
-    key: 'providers',
-    eyebrow: 'Providers',
-    title: 'Best-fit providers, ranked for each layer',
+    key: 'evidence',
+    eyebrow: 'Slow motion',
+    title: 'Playing back the evidence frame by frame',
     glow: '52,211,153',
   },
   {
     key: 'ready',
-    eyebrow: 'Completed',
-    title: 'Your stack is ready',
+    eyebrow: 'Decision',
+    title: 'Decision: NOT OUT',
     glow: '45,212,191',
   },
 ] as const;
 
-const DEMO_CATEGORIES = [
-  { id: 'frontend', providers: ['React', 'Next.js'] },
-  { id: 'backend', providers: ['Node.js', 'Supabase'] },
-  { id: 'database', providers: ['PostgreSQL'] },
-  { id: 'authentication', providers: ['Clerk'] },
-  { id: 'payments', providers: ['Stripe'] },
+const DEMO_EVIDENCE = [
+  { id: 'impact', label: 'Impact point', value: 'In line', color: 'text-cyan-300' },
+  { id: 'tracking', label: 'Ball tracking', value: 'Heading for off stump', color: 'text-violet-300' },
+  { id: 'height', label: 'Height at impact', value: 'Above stumps', color: 'text-amber-300' },
+  { id: 'stumps', label: 'Wickets', value: 'Bails intact', color: 'text-emerald-300' },
 ] as const;
 
-const STAGE_MS = 1700;
+const STAGE_MS = 1500;
 const LAST_STAGE = STAGES.length - 1;
 
 export function DemoModal({
@@ -127,7 +125,7 @@ export function DemoModal({
             ref={rootRef}
             role="dialog"
             aria-modal="true"
-            aria-label="Stack2Set demo"
+            aria-label="Turf DRS demo"
             initial={{ opacity: 0, y: 22, scale: 0.97 }}
             animate={{ opacity: 1, y: 0, scale: 1 }}
             exit={{ opacity: 0, y: 16, scale: 0.97 }}
@@ -147,7 +145,7 @@ export function DemoModal({
 
             <div className="relative flex items-center justify-between">
               <span className="text-xs font-medium uppercase tracking-[0.2em] text-muted-foreground">
-                Stack2Set Demo
+                Turf DRS Demo
               </span>
               <button
                 ref={closeRef}
@@ -177,10 +175,10 @@ export function DemoModal({
                         background: `linear-gradient(135deg, rgba(${current.glow}, 0.25), rgba(${current.glow}, 0.06))`,
                       }}
                     >
-                      {stage === 0 && <Lightbulb className="h-6 w-6 text-purple-300" />}
-                      {stage === 1 && <Cpu className="h-6 w-6 text-violet-300" />}
-                      {stage === 2 && <Sparkles className="h-6 w-6 text-cyan-300" />}
-                      {stage === 3 && <Sparkles className="h-6 w-6 text-emerald-300" />}
+                      {stage === 0 && <Camera className="h-6 w-6 text-purple-300" />}
+                      {stage === 1 && <ScanLine className="h-6 w-6 text-violet-300" />}
+                      {stage === 2 && <Gauge className="h-6 w-6 text-cyan-300" />}
+                      {stage === 3 && <Video className="h-6 w-6 text-emerald-300" />}
                       {stage === 4 && <Check className="h-6 w-6 text-teal-300" />}
                     </div>
                     <p className="mt-4 text-xs font-medium uppercase tracking-widest text-muted-foreground">
@@ -191,51 +189,39 @@ export function DemoModal({
                     </h3>
                   </div>
 
-                  {stage >= 2 && (
+                  {stage >= 2 && stage < 4 && (
                     <div className="mx-auto mt-7 flex max-w-sm flex-col gap-2.5">
-                      {DEMO_CATEGORIES.map((category, index) => {
-                        const meta = getCategoryMeta(category.id);
-                        const Icon = meta.icon;
-                        const showProviders = stage >= 3;
-                        return (
-                          <motion.div
-                            key={category.id}
-                            initial={reduceMotion ? false : { opacity: 0, x: -10 }}
-                            animate={{ opacity: 1, x: 0 }}
-                            transition={{ delay: index * 0.08 }}
-                            style={categoryCssVars(meta.color)}
-                            className="rounded-xl border border-foreground/8 bg-foreground/[0.02] px-3 py-2"
-                          >
-                            <div className="flex items-center gap-2.5">
-                              <span className="cat-icon-box flex h-7 w-7 shrink-0 items-center justify-center rounded-lg ring-1 ring-foreground/10">
-                                <Icon className={`h-3.5 w-3.5 ${meta.color.text}`} />
-                              </span>
-                              <span className="flex-1 truncate text-xs font-medium text-foreground">
-                                {meta.name}
-                              </span>
-                              {showProviders && (
-                                <span className="flex gap-1">
-                                  {category.providers.map((provider) => (
-                                    <span
-                                      key={provider}
-                                      className="cat-border rounded-md border px-1.5 py-0.5 text-[9px] text-foreground/75"
-                                    >
-                                      {provider}
-                                    </span>
-                                  ))}
-                                </span>
-                              )}
-                            </div>
-                          </motion.div>
-                        );
-                      })}
+                      {DEMO_EVIDENCE.map((evidence, index) => (
+                        <motion.div
+                          key={evidence.id}
+                          initial={reduceMotion ? false : { opacity: 0, x: -10 }}
+                          animate={{ opacity: 1, x: 0 }}
+                          transition={{ delay: index * 0.08 }}
+                          className="rounded-xl border border-foreground/8 bg-foreground/[0.02] px-3 py-2"
+                        >
+                          <div className="flex items-center gap-2.5">
+                            <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-foreground/[0.04] ring-1 ring-foreground/10">
+                              <ScanLine className="h-3.5 w-3.5 text-teal-400" />
+                            </span>
+                            <span className="flex-1 truncate text-xs font-medium text-foreground">
+                              {evidence.label}
+                            </span>
+                            <span
+                              className={`truncate text-[10px] font-medium ${evidence.color}`}
+                            >
+                              {evidence.value}
+                            </span>
+                          </div>
+                        </motion.div>
+                      ))}
                     </div>
                   )}
 
-                  {stage === 4 && (
+                  {stage >= 4 && (
                     <div className="mx-auto mt-6 flex flex-col items-center gap-3">
                       <p className="max-w-xs text-xs leading-relaxed text-muted-foreground">
-                        Then save it to the cloud, compare providers, and share it with your team.
+                        Too high — bails intact. Turf DRS keeps the decision fair with clear visual
+                        evidence.
                       </p>
                       <button
                         type="button"
@@ -243,7 +229,7 @@ export function DemoModal({
                         className="inline-flex items-center gap-2 rounded-full bg-teal-500 px-6 py-2.5 text-sm font-medium text-white shadow-lg shadow-teal-500/25 transition-all hover:bg-teal-600 active:scale-95"
                       >
                         <Sparkles className="h-4 w-4" />
-                        Get the Stack
+                        Start a Live Review
                       </button>
                     </div>
                   )}

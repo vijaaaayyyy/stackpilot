@@ -110,14 +110,15 @@ export default function AccountPage() {
           </section>
 
           <section className="glass rounded-2xl p-6">
-            <h3 className="text-sm font-semibold text-foreground">Workspace</h3>
+            <h3 className="text-sm font-semibold text-foreground">Turf DRS</h3>
             <p className="mt-1 text-sm text-muted-foreground">
-              Your stacks are synced to the cloud and stay available on any device.
+              Your matches, teams, and review history are stored in this account and stay
+              available across devices.
             </p>
             <div className="mt-4 flex flex-wrap gap-2">
               <Button asChild className="h-9 gap-1.5 bg-teal-500 text-xs text-white hover:bg-teal-600">
-                <Link href="/workspace">
-                  <Sparkles className="h-3.5 w-3.5" /> Open Workspace
+                <Link href="/dashboard">
+                  <Sparkles className="h-3.5 w-3.5" /> Go to Dashboard
                 </Link>
               </Button>
             </div>

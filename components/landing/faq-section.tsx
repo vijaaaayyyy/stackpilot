@@ -14,7 +14,7 @@ export function FaqSection() {
             Frequently asked <span className="gradient-text">questions</span>
           </h2>
           <p className="mt-4 text-base text-muted-foreground sm:text-lg">
-            Quick answers about Stack2Set, recommendations, and building your stack.
+            Quick answers about Turf DRS, its reviews, and keeping your matches fair.
           </p>
         </div>
 

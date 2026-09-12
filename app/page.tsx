@@ -4,12 +4,14 @@ import { Hero } from '@/components/landing/hero';
 import { HowItWorks } from '@/components/landing/how-it-works';
 import { FloatingBadges } from '@/components/landing/floating-badges';
 import { Features } from '@/components/landing/features';
+import { Audience } from '@/components/landing/audience';
 import { FaqSection } from '@/components/landing/faq-section';
 import { DocsSection } from '@/components/landing/docs-section';
 import { CTA } from '@/components/landing/cta';
 import { Footer } from '@/components/landing/footer';
 import { DynamicIsland } from '@/components/landing/dynamic-island';
 import { ScrollLightField, LightReveal, SectionGlow } from '@/components/cinematic/scroll-lighting';
+import { CanvasParticles } from '@/components/ui/canvas-particles';
 import { siteConfig, absoluteUrl } from '@/lib/site';
 import {
   organizationSchema,
@@ -49,6 +51,13 @@ const jsonLd = [
   softwareApplicationSchema(),
 ];
 
+const particleColors = [
+  'rgba(34, 211, 238, 0.7)',
+  'rgba(99, 102, 241, 0.7)',
+  'rgba(168, 85, 247, 0.7)',
+  'rgba(244, 114, 182, 0.7)',
+];
+
 export default function Home() {
   return (
     <main className="relative min-h-screen overflow-x-hidden pb-28">
@@ -59,7 +68,11 @@ export default function Home() {
           dangerouslySetInnerHTML={{ __html: serializeJsonLd(schema) }}
         />
       ))}
+      {/* One continuous full-page background: travelling light + star field behind every section */}
       <ScrollLightField />
+      <div aria-hidden="true" className="pointer-events-none fixed inset-0 -z-10">
+        <CanvasParticles colors={particleColors} className="h-full w-full opacity-45" />
+      </div>
       <Navbar />
       <Hero />
       <LightReveal className="relative">
@@ -70,6 +83,10 @@ export default function Home() {
       <LightReveal className="relative">
         <SectionGlow glow="indigo" />
         <Features />
+      </LightReveal>
+      <LightReveal className="relative">
+        <SectionGlow glow="indigo" />
+        <Audience />
       </LightReveal>
       <FaqSection />
       <DocsSection />

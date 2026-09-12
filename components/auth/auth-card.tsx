@@ -2,7 +2,7 @@
 
 import type { ReactNode } from 'react';
 import Link from 'next/link';
-import { Sparkles } from 'lucide-react';
+import { TurfLogo } from '@/components/landing/brand-logo';
 import { cn } from '@/lib/utils';
 
 export function AuthCard({
@@ -26,11 +26,11 @@ export function AuthCard({
       <div className={cn('w-full max-w-md', className)}>
         <div className="mb-8 flex flex-col items-center text-center">
           <Link href="/" className="flex items-center gap-2">
-            <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-teal-500">
-              <Sparkles className="h-5 w-5 text-white" />
+            <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-teal-500 text-white shadow-lg shadow-teal-500/25">
+              <TurfLogo className="h-5 w-5" />
             </div>
             <span className="text-lg font-semibold tracking-tight text-foreground">
-              Stack<span className="gradient-text">2set</span>
+              Turf <span className="gradient-text">DRS</span>
             </span>
           </Link>
         </div>

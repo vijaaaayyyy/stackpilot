@@ -2,14 +2,14 @@
 
 import { motion } from 'framer-motion';
 import {
-  Sparkles,
-  Zap,
-  Database,
-  ShieldCheck,
-  Cloud,
-  CreditCard,
+  Camera,
+  Clapperboard,
+  Film,
+  Footprints,
+  RefreshCcw,
   Rocket,
-  Bot,
+  ShieldCheck,
+  Sparkles,
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 
@@ -23,20 +23,20 @@ type Badge = {
 };
 
 const badges: Badge[] = [
-  { icon: Sparkles, label: 'AI Powered', gradient: 'from-teal-500 to-cyan-500', tilt: -6, duration: 6, delay: 0 },
-  { icon: Zap, label: 'Fast Recommendations', gradient: 'from-amber-400 to-orange-500', tilt: 5, duration: 5.5, delay: 0.06 },
-  { icon: Database, label: 'Database Discovery', gradient: 'from-emerald-400 to-teal-500', tilt: -4, duration: 6.5, delay: 0.12 },
-  { icon: ShieldCheck, label: 'Authentication', gradient: 'from-sky-400 to-blue-500', tilt: 6, duration: 5.8, delay: 0.18 },
-  { icon: Cloud, label: 'Cloud Ready', gradient: 'from-cyan-400 to-sky-500', tilt: -5, duration: 6.2, delay: 0.24 },
-  { icon: CreditCard, label: 'Payments', gradient: 'from-fuchsia-400 to-pink-500', tilt: 4, duration: 5.6, delay: 0.3 },
-  { icon: Rocket, label: 'Production Ready', gradient: 'from-rose-400 to-red-500', tilt: -6, duration: 6.4, delay: 0.36 },
-  { icon: Bot, label: 'AI Generated', gradient: 'from-teal-400 to-cyan-500', tilt: 5, duration: 5.9, delay: 0.42 },
+  { icon: Sparkles, label: 'AI-Powered Reviews', gradient: 'from-teal-500 to-cyan-500', tilt: -6, duration: 6, delay: 0 },
+  { icon: Camera, label: 'Auto-Capture', gradient: 'from-amber-400 to-orange-500', tilt: 5, duration: 5.5, delay: 0.06 },
+  { icon: Clapperboard, label: '240 fps Slow-Mo', gradient: 'from-emerald-400 to-teal-500', tilt: -4, duration: 6.5, delay: 0.12 },
+  { icon: ShieldCheck, label: 'Fair Decisions', gradient: 'from-sky-400 to-blue-500', tilt: 6, duration: 5.8, delay: 0.18 },
+  { icon: Film, label: 'Frame-by-Frame', gradient: 'from-cyan-400 to-sky-500', tilt: -5, duration: 6.2, delay: 0.24 },
+  { icon: RefreshCcw, label: 'Instant Replay', gradient: 'from-fuchsia-400 to-pink-500', tilt: 4, duration: 5.6, delay: 0.3 },
+  { icon: Rocket, label: 'Full Match Replay', gradient: 'from-rose-400 to-red-500', tilt: -6, duration: 6.4, delay: 0.36 },
+  { icon: Footprints, label: 'Run Out Checks', gradient: 'from-teal-400 to-cyan-500', tilt: 5, duration: 5.9, delay: 0.42 },
 ];
 
 export function FloatingBadges() {
   return (
     <section
-      aria-label="What Stack2Set offers"
+      aria-label="What Turf DRS offers"
       className="relative px-4 py-10 sm:px-6 sm:py-14"
     >
       <div className="mx-auto flex max-w-5xl flex-wrap items-center justify-center gap-3 sm:gap-4">

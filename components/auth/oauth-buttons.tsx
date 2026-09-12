@@ -37,7 +37,7 @@ function GithubIcon() {
   );
 }
 
-export function OAuthButtons({ next = '/workspace' }: { next?: string }) {
+export function OAuthButtons({ next = '/dashboard' }: { next?: string }) {
   const { signInWithOAuth } = useAuth();
   const [pending, setPending] = useState<'google' | 'github' | null>(null);
 

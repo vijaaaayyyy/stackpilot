@@ -19,7 +19,7 @@ import { Separator } from '@/components/ui/separator';
  */
 export function AuthEmailForm({
   mode,
-  next = '/workspace',
+  next = '/dashboard',
   switchHref,
   onSwitchMode,
 }: {

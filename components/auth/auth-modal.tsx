@@ -21,7 +21,7 @@ export function AuthModal({
   open,
   onOpenChange,
   query,
-  next = '/workspace',
+  next = '/dashboard',
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;

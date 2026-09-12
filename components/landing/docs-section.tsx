@@ -1,8 +1,38 @@
 import Link from 'next/link';
 import { ArrowRight, BookOpen } from 'lucide-react';
-import { docGroups } from '@/lib/docs';
 
-const topics = docGroups.flatMap((group) => group.items).slice(0, 6);
+const topics = [
+  {
+    slug: 'getting-started',
+    title: 'Getting Started',
+    description: 'Set your ground up for Turf DRS reviews in minutes.',
+  },
+  {
+    slug: 'reviews',
+    title: 'How Reviews Work',
+    description: 'From on-field signal to final decision — the full review flow.',
+  },
+  {
+    slug: 'camera-setup',
+    title: 'Camera Setup',
+    description: 'Best angles and positions for reliable, reviewable footage.',
+  },
+  {
+    slug: 'ball-tracking',
+    title: 'Ball Tracking',
+    description: 'How trajectory and impact point are measured and visualised.',
+  },
+  {
+    slug: 'lbw-reviews',
+    title: 'LBW & Wicket Reviews',
+    description: 'Reading impact, bounce, and ball path with confidence.',
+  },
+  {
+    slug: 'academies-clubs',
+    title: 'Academies & Clubs',
+    description: 'Match days, nets sessions, and leagues for coaches and clubs.',
+  },
+];
 
 export function DocsSection() {
   return (
@@ -12,10 +42,10 @@ export function DocsSection() {
         <div className="mx-auto max-w-2xl text-center">
           <p className="text-sm font-medium text-teal-400">Documentation</p>
           <h2 className="mt-3 text-balance text-3xl font-semibold tracking-tight text-foreground sm:text-5xl">
-            Learn to build with <span className="gradient-text">Stack2Set</span>
+            Guides for <span className="gradient-text">every decision</span>
           </h2>
           <p className="mt-4 text-base text-muted-foreground sm:text-lg">
-            Guides for discovering, comparing, and assembling the perfect technology stack.
+            Everything you need to set up, run, and master Turf DRS reviews on your turf.
           </p>
         </div>
 

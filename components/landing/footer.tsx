@@ -1,5 +1,6 @@
 import { Github, Mail, Twitter, Sparkles } from 'lucide-react';
 import { siteConfig } from '@/lib/site';
+import { TurfLogo } from '@/components/landing/brand-logo';
 
 const footerLinks: Record<string, { label: string; href: string }[]> = {
   Product: [
@@ -38,14 +39,14 @@ export function Footer() {
           <div className="md:col-span-2">
             <a href="/" className="flex items-center gap-2">
               <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-teal-500">
-                <Sparkles className="h-5 w-5 text-white" />
+                <TurfLogo className="h-5 w-5 text-white" />
               </div>
               <span className="text-lg font-semibold tracking-tight text-foreground">
-                Stack<span className="gradient-text">2set</span>
+                Turf <span className="gradient-text">DRS</span>
               </span>
             </a>
             <p className="mt-4 max-w-xs text-sm text-muted-foreground">
-              Discover every technology, API, and service needed to build your next application.
+              Your local third umpire — professional cricket reviews for local matches, turf cricket, academies and clubs.
             </p>
             <div className="mt-6 flex gap-3">
               {socialLinks.map((social) => (
@@ -85,7 +86,7 @@ export function Footer() {
 
         <div className="mt-12 flex flex-col items-center justify-between gap-4 border-t border-foreground/5 pt-8 sm:flex-row">
           <p className="text-xs text-muted-foreground">
-            © {new Date().getFullYear()} Stack2Set. All rights reserved.
+            © {new Date().getFullYear()} Turf DRS. All rights reserved.
           </p>
           <p className="text-xs text-muted-foreground">
             Built for developers, by developers with LOVE!.

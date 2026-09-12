@@ -1,5 +1,5 @@
 import Link from 'next/link';
-import { ArrowRight, Sparkles } from 'lucide-react';
+import { ArrowRight, Play, Sparkles } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Reveal } from '@/components/ui/reveal';
 
@@ -18,11 +18,11 @@ export function CTA() {
             </div>
 
             <h2 className="mt-6 text-balance text-3xl font-semibold tracking-tight text-foreground sm:text-5xl">
-              Turn your idea into a <span className="gradient-text">production-ready stack</span>
+              Put the third umpire in <span className="gradient-text">your corner</span>
             </h2>
             <p className="mx-auto mt-4 max-w-xl text-base leading-relaxed text-muted-foreground sm:text-lg">
-              Describe what you&apos;re building and Stack2Set maps it to the technology categories it
-              needs, ranks the best providers, and assembles a stack you can act on.
+              Set up a camera, start recording, and every delivery becomes reviewable — slow-mo, ball
+              tracking, and a fair decision when the on-field umpire needs one.
             </p>
 
             <div className="mt-8 flex flex-col items-center justify-center gap-4 sm:flex-row">
@@ -30,9 +30,9 @@ export function CTA() {
                 asChild
                 className="h-12 rounded-xl bg-teal-500 px-8 text-base text-white shadow-lg shadow-teal-500/25 transition-all hover:bg-teal-600 hover:shadow-teal-500/40"
               >
-                <Link href="/">
-                  Get Started
-                  <ArrowRight className="ml-2 h-4 w-4" />
+                <Link href="/live?demo=1">
+                  <Play className="mr-2 h-4 w-4" />
+                  Start Demo Match
                 </Link>
               </Button>
               <Button
@@ -40,7 +40,7 @@ export function CTA() {
                 variant="outline"
                 className="h-12 rounded-xl border-foreground/10 bg-transparent px-8 text-base text-foreground hover:bg-foreground/5"
               >
-                <Link href="/docs/getting-started">View Demo</Link>
+                <Link href="/pricing">View Pricing</Link>
               </Button>
             </div>
           </div>

@@ -60,7 +60,7 @@ export function SearchBar({
           onChange={(e) => setQuery(e.target.value)}
           placeholder={placeholder}
           autoFocus={autoFocus}
-          aria-label="Describe your project"
+          aria-label="Ask Turf DRS"
           maxLength={MAX_DESCRIPTION_LENGTH + 200}
           aria-invalid={overLimit}
           className="w-full bg-transparent text-base text-foreground placeholder:text-muted-foreground focus:outline-none"

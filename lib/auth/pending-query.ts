@@ -89,6 +89,6 @@ export function getPostAuthTarget(fallback: string): { path: string; hasPending:
   if (pending) {
     return { path: `/search?q=${encodeURIComponent(pending)}`, hasPending: true };
   }
-  const safe = fallback.startsWith('/') && !fallback.startsWith('//') ? fallback : '/workspace';
+  const safe = fallback.startsWith('/') && !fallback.startsWith('//') ? fallback : '/dashboard';
   return { path: safe, hasPending: false };
 }

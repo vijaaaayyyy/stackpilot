@@ -10,8 +10,17 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
 
   // Categories and providers come from the configured store (hosted Supabase in
   // production). The clean, indexable URL is `/browse/categories/{slug}` — never
-  // the legacy query-string route `/category?id=...`.
-  const dbCategories = await providerService.getAllCategories();
+  // the legacy query-string route `/category?id=...`. If the catalog isn't
+  // seeded/available yet (first run, seed race), fall back to static pages only.
+  let dbCategories: Awaited<ReturnType<typeof providerService.getAllCategories>> = [];
+  let providers: Awaited<ReturnType<typeof providerService.getAllProviders>> = [];
+  try {
+    dbCategories = await providerService.getAllCategories();
+    providers = await providerService.getAllProviders();
+  } catch {
+    dbCategories = [];
+    providers = [];
+  }
 
   const categoryPages: MetadataRoute.Sitemap = dbCategories.map((category) => {
     let lastModified = new Date(category.updatedAt);
@@ -24,7 +33,6 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     };
   });
 
-  const providers = await providerService.getAllProviders();
   const providerPages: MetadataRoute.Sitemap = providers
     .filter((p) => p.status === 'active')
     .map((p) => {

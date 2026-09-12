@@ -3,7 +3,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { AnimatePresence, motion, useReducedMotion } from 'framer-motion';
 import { ArrowRight, Check, Cloud, Loader2, Play, Sparkles } from 'lucide-react';
-import { DemoModal } from './demo-modal';
 import { useAuth } from '@/lib/auth/auth-context';
 import { subscribeIslandPhase, type IslandPhase } from '@/lib/island-store';
 
@@ -28,7 +27,6 @@ export function DynamicIsland({
 }) {
   const { user, loading } = useAuth();
   const [expanded, setExpanded] = useState(false);
-  const [demoOpen, setDemoOpen] = useState(false);
   const [phase, setPhase] = useState<IslandPhase>('idle');
   const reduceMotion = useReducedMotion();
   const islandRef = useRef<HTMLDivElement>(null);
@@ -108,8 +106,8 @@ export function DynamicIsland({
                   type="button"
                   onClick={(event) => {
                     event.stopPropagation();
-                    setDemoOpen(true);
                     setExpanded(false);
+                    window.location.href = '/live?demo=1';
                   }}
                   className={`${actionButtonClass} text-white/85 hover:text-white`}
                 >
@@ -124,8 +122,6 @@ export function DynamicIsland({
           </AnimatePresence>
         </motion.div>
       </div>
-
-      <DemoModal open={demoOpen} onOpenChange={setDemoOpen} onGetStack={focusSearch} />
     </>
   );
 }

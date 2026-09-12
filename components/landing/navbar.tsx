@@ -1,11 +1,12 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { usePathname } from 'next/navigation';
+import { usePathname, useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { Menu, X, Sparkles, UserRound } from 'lucide-react';
+import { Menu, X, Sparkles, UserRound, Settings2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { ThemeSwitcher } from '@/components/landing/theme-switcher';
+import { TurfLogo } from '@/components/landing/brand-logo';
 import { useAuth } from '@/lib/auth/auth-context';
 import {
   DropdownMenu,
@@ -24,11 +25,19 @@ type NavLink = {
   pattern: string;
 };
 
-const navLinks: NavLink[] = [
+const publicNavLinks: NavLink[] = [
   { label: 'Home', href: '/', pattern: '/' },
   { label: 'Explore', href: '/explore', pattern: '/explore' },
   { label: 'Browse', href: '/browse/providers', pattern: '/browse/providers' },
   { label: 'Pricing', href: '/pricing', pattern: '/pricing' },
+];
+
+const appNavLinks: NavLink[] = [
+  { label: 'Dashboard', href: '/dashboard', pattern: '/dashboard' },
+  { label: 'Matches', href: '/matches', pattern: '/matches' },
+  { label: 'Live', href: '/live', pattern: '/live' },
+  { label: 'Reviews', href: '/reviews', pattern: '/reviews' },
+  { label: 'Analytics', href: '/analytics', pattern: '/analytics' },
 ];
 
 function matchesPath(pathname: string, pattern: string): boolean {
@@ -41,11 +50,24 @@ function matchesPath(pathname: string, pattern: string): boolean {
 
 export function Navbar() {
   const pathname = usePathname();
-  const { user, loading } = useAuth();
+  const router = useRouter();
+  const { user, loading, signOut } = useAuth();
   const [scrolled, setScrolled] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
 
+  const isSignedIn = !loading && user;
+  const navLinks = isSignedIn ? appNavLinks : publicNavLinks;
   const activeLabel = navLinks.find((link) => matchesPath(pathname, link.pattern))?.label ?? null;
+
+  const mobileLinks = isSignedIn
+    ? [
+        ...appNavLinks,
+        { label: 'Teams', href: '/teams', pattern: '/teams' },
+        { label: 'Players', href: '/players', pattern: '/players' },
+        { label: 'Cameras', href: '/cameras', pattern: '/cameras' },
+        { label: 'Settings', href: '/settings', pattern: '/settings' },
+      ]
+    : publicNavLinks;
 
   const displayName =
     user?.user_metadata?.name ?? user?.email?.split('@')[0] ?? 'Account';
@@ -83,10 +105,10 @@ export function Navbar() {
         <div className="flex items-center gap-3 sm:gap-5">
           <Link href="/" className="flex items-center gap-2" onClick={() => setMobileOpen(false)}>
             <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-teal-500">
-              <Sparkles className="h-5 w-5 text-white" />
+              <TurfLogo className="h-5 w-5 text-white" />
             </div>
             <span className="text-lg font-semibold tracking-tight text-foreground">
-              Stack<span className="gradient-text">2set</span>
+              Turf <span className="gradient-text">DRS</span>
             </span>
           </Link>
         </div>
@@ -125,18 +147,55 @@ export function Navbar() {
                   {displayName}
                 </span>
               </DropdownMenuTrigger>
-              <DropdownMenuContent align="end" className="w-48">
+              <DropdownMenuContent align="end" className="w-56">
                 <DropdownMenuLabel className="truncate">{user.email}</DropdownMenuLabel>
                 <DropdownMenuSeparator />
+                <DropdownMenuItem asChild>
+                  <Link href="/dashboard" className="gap-2">
+                    <Sparkles className="h-4 w-4" /> Dashboard
+                  </Link>
+                </DropdownMenuItem>
+                <DropdownMenuItem asChild>
+                  <Link href="/matches" className="gap-2">
+                    <Sparkles className="h-4 w-4" /> Matches
+                  </Link>
+                </DropdownMenuItem>
+                <DropdownMenuItem asChild>
+                  <Link href="/teams" className="gap-2">
+                    <Sparkles className="h-4 w-4" /> Teams
+                  </Link>
+                </DropdownMenuItem>
+                <DropdownMenuItem asChild>
+                  <Link href="/players" className="gap-2">
+                    <Sparkles className="h-4 w-4" /> Players
+                  </Link>
+                </DropdownMenuItem>
+                <DropdownMenuItem asChild>
+                  <Link href="/cameras" className="gap-2">
+                    <Sparkles className="h-4 w-4" /> Cameras
+                  </Link>
+                </DropdownMenuItem>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem asChild>
+                  <Link href="/settings" className="gap-2">
+                    <Settings2 className="h-4 w-4" /> Settings
+                  </Link>
+                </DropdownMenuItem>
                 <DropdownMenuItem asChild>
                   <Link href="/account" className="gap-2">
                     <UserRound className="h-4 w-4" /> Account
                   </Link>
                 </DropdownMenuItem>
-                <DropdownMenuItem asChild>
-                  <Link href="/workspace" className="gap-2">
-                    <Sparkles className="h-4 w-4" /> Workspace
-                  </Link>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem
+                  onSelect={async () => {
+                    await signOut();
+                    router.push('/');
+                    router.refresh();
+                  }}
+                  className="gap-2 text-rose-300 focus:bg-rose-500/10 focus:text-rose-200"
+                >
+                  Sign out
                 </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
@@ -171,7 +230,7 @@ export function Navbar() {
             <div className="mb-2 self-start">
               <ThemeSwitcher />
             </div>
-            {navLinks.map((link) => (
+            {mobileLinks.map((link) => (
               <Link
                 key={link.label}
                 href={link.href}
@@ -202,10 +261,16 @@ export function Navbar() {
                       <UserRound className="h-4 w-4" /> Account
                     </Link>
                   </Button>
-                  <Button asChild className="bg-teal-500 text-white">
-                    <Link href="/workspace">
-                      <Sparkles className="h-4 w-4" /> Workspace
-                    </Link>
+                  <Button
+                    onClick={async () => {
+                      await signOut();
+                      router.push('/');
+                      router.refresh();
+                    }}
+                    variant="outline"
+                    className="border-rose-500/30 text-rose-300 hover:bg-rose-500/10"
+                  >
+                    Sign out
                   </Button>
                 </>
               ) : (

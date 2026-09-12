@@ -8,7 +8,7 @@ import { AuthEmailForm } from '@/components/auth/auth-email-form';
 
 function LoginContent() {
   const searchParams = useSearchParams();
-  const next = searchParams.get('next') ?? '/workspace';
+  const next = searchParams.get('next') ?? '/dashboard';
 
   return (
     <AuthCard

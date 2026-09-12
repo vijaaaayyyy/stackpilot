@@ -14,10 +14,12 @@ function fmt(seconds: number): string {
 
 export function FootageCapture({
   ballId,
+  matchId,
   initial,
   onClip,
 }: {
   ballId: string;
+  matchId?: string;
   initial: ReviewClip | null;
   onClip: (clip: ReviewClip, ok: boolean) => void;
 }) {
@@ -80,7 +82,7 @@ export function FootageCapture({
     setUploading(true);
     setError(null);
     const durationMs = Math.round(seconds * 1000);
-    const { clip: newClip, ok } = await uploadClip(pending, ballId, { durationMs });
+    const { clip: newClip, ok } = await uploadClip(pending, ballId, { matchId, durationMs });
     setClip(newClip);
     setUploading(false);
     setSaved(true);
@@ -94,7 +96,7 @@ export function FootageCapture({
     setSaved(false);
     setUploading(true);
     const durationMs = 0;
-    const { clip: newClip, ok } = await uploadClip(file, ballId, { durationMs });
+    const { clip: newClip, ok } = await uploadClip(file, ballId, { matchId, durationMs });
     setClip(newClip);
     setUploading(false);
     setSaved(true);

@@ -58,14 +58,23 @@ export function deleteClip(ballId: string): void {
   delete index[ballId];
   writeIndex(index);
   window.dispatchEvent(new CustomEvent('turf-drs:clips-changed'));
+  deleteClipRow(ballId).catch(() => undefined);
 }
 
-/** A tiny MediaRecorder wrapper that captures from the rear camera. */
+/**
+ * A MediaRecorder rolling buffer for the match camera: records in ~2s chunks,
+ * keeps only the last 8 (~15s) in memory and drops older ones as new chunks
+ * arrive, so memory stays flat even if recording runs all match. `snapshot()`
+ * stitches the current buffer into one Blob without stopping — review / upload
+ * takes the current window and recording keeps rolling for the next delivery.
+ */
 export class ClipRecorder {
+  private static readonly TIMESLICE_MS = 2000;
+  private static readonly MAX_BUFFER_CHUNKS = 8;
+
   private mediaStream: MediaStream | null = null;
   private recorder: MediaRecorder | null = null;
   private chunks: { time: number; data: Blob }[] = [];
-  private keepLastSeconds = 0;
   private startedAt = 0;
   private timer: number | null = null;
   private elapsed = 0;
@@ -120,27 +129,24 @@ export class ClipRecorder {
     });
     this.chunks = [];
     this.recorder.ondataavailable = (event) => {
-      if (event.data.size > 0) this.chunks.push({ time: Date.now(), data: event.data });
+      if (event.data.size > 0) {
+        this.chunks.push({ time: Date.now(), data: event.data });
+        /* Rolling buffer — discard chunks older than the window we care about */
+        while (this.chunks.length > ClipRecorder.MAX_BUFFER_CHUNKS) {
+          this.chunks.shift();
+        }
+      }
     };
     this.recorder.onstop = () => {
-      let kept = this.chunks;
-      if (this.keepLastSeconds > 0) {
-        const windowStart = Date.now() - this.keepLastSeconds * 1000;
-        const within = kept.filter((chunk) => chunk.time >= windowStart);
-        if (within.length > 0) kept = within;
-        else kept = kept.slice(-1);
-      }
-      const blob = new Blob(
-        kept.map((chunk) => chunk.data),
-        { type: this.recorder?.mimeType || mime },
-      );
-      if (blob.size > 0) this.onDone?.(blob);
-      this.doneResolve?.(blob.size > 0 ? blob : null);
+      const blob = this.snapshot();
+      if (blob) this.onDone?.(blob);
+      this.doneResolve?.(blob ?? null);
       this.doneResolve = null;
-      this.stop(false).catch(() => undefined);
+      this.recorder = null;
     };
-    this.recorder.start(250);
+    this.recorder.start(ClipRecorder.TIMESLICE_MS);
     this.startedAt = Date.now();
+    this.elapsed = 0;
     if (this.timer) window.clearInterval(this.timer);
     this.timer = window.setInterval(() => {
       this.elapsed = (Date.now() - this.startedAt) / 1000;
@@ -149,9 +155,28 @@ export class ClipRecorder {
   }
 
   /**
-   * Stop capturing. `keepLastSeconds` trims the recording to just the last
-   * N seconds (e.g. the final delivery) when the review is triggered.
-   * Resolves with the captured blob (null if nothing was recorded yet).
+   * Stitch the in-memory rolling buffer into a single Blob WITHOUT stopping
+   * the recorder — recording keeps rolling for the next delivery. Optional
+   * `keepLastSeconds` trims to just that trailing window.
+   */
+  snapshot(keepLastSeconds = 0): Blob | null {
+    if (this.chunks.length === 0) return null;
+    let kept = this.chunks;
+    if (keepLastSeconds > 0) {
+      const windowStart = Date.now() - keepLastSeconds * 1000;
+      const within = this.chunks.filter((chunk) => chunk.time >= windowStart);
+      if (within.length > 0) kept = within;
+    }
+    const blob = new Blob(
+      kept.map((chunk) => chunk.data),
+      { type: this.recorder?.mimeType || 'video/webm' },
+    );
+    return blob.size > 0 ? blob : null;
+  }
+
+  /**
+   * Stop capturing and resolve with the buffered footage. `keepLastSeconds`
+   * trims the rolling buffer to just the trailing window (the final delivery).
    */
   async stop(stopTracks = true, keepLastSeconds = 0): Promise<Blob | null> {
     if (this.timer) {
@@ -159,13 +184,14 @@ export class ClipRecorder {
       this.timer = null;
     }
     this.elapsed = (Date.now() - this.startedAt) / 1000;
-    this.keepLastSeconds = keepLastSeconds;
-    let done: Promise<Blob | null> = Promise.resolve(null);
+    let done: Promise<Blob | null> = Promise.resolve(this.snapshot(keepLastSeconds));
     if (this.recorder?.state === 'recording') {
       done = new Promise<Blob | null>((resolve) => {
         this.doneResolve = resolve;
       });
       this.recorder.stop();
+    } else {
+      this.recorder = null;
     }
     if (stopTracks && this.mediaStream) {
       this.mediaStream.getTracks().forEach((track) => track.stop());
@@ -181,15 +207,22 @@ export class ClipRecorder {
 
 export type ClipUploadResult = { clip: ReviewClip; ok: boolean };
 
-/** Upload a captured blob to Supabase Storage and refresh the local index. */
+/**
+ * Upload a captured blob to Supabase Storage (`drs-clips` private bucket,
+ * `{match_id}/{ball_id}.webm`) and refresh the local index. The returned clip
+ * carries a time-limited signed URL for playback; callers should re-resolve
+ * via `resolveClipUrl` once it expires.
+ */
 export async function uploadClip(
   blob: Blob,
   ballId: string,
-  metadata?: { durationMs?: number },
+  metadata?: { matchId?: string; durationMs?: number },
 ): Promise<ClipUploadResult> {
   const owner = await currentUserId();
-  const path = `${owner}/${ballId}-${Date.now()}.webm`;
+  const folder = metadata?.matchId || owner;
+  const path = `${folder}/${ballId}.webm`;
   let url = '';
+  let ok = false;
   if (isSupabaseConfigured) {
     try {
       const client = createClient();
@@ -197,9 +230,13 @@ export async function uploadClip(
         .from(CLIPS_BUCKET)
         .upload(path, blob, { contentType: blob.type || 'video/webm', upsert: true });
       if (error) throw error;
-      url = client.storage.from(CLIPS_BUCKET).getPublicUrl(data.path).data.publicUrl;
+      const signed = await client.storage.from(CLIPS_BUCKET).createSignedUrl(data.path, 3600);
+      if (signed.error) throw signed.error;
+      url = signed.data?.signedUrl ?? '';
+      ok = Boolean(url);
     } catch {
       url = '';
+      ok = false;
     }
   }
   if (!url && typeof window !== 'undefined') {
@@ -207,7 +244,7 @@ export async function uploadClip(
   }
   const clip: ReviewClip = {
     ballId,
-    name: `delivery-${ballId}.webm`,
+    name: `${ballId}.webm`,
     size: blob.size,
     mime: blob.type || 'video/webm',
     durationMs: metadata?.durationMs ?? 0,
@@ -216,7 +253,25 @@ export async function uploadClip(
     url,
   };
   cacheClip(clip);
-  return { clip, ok: isSupabaseConfigured && Boolean(url) };
+  await saveClipRow(clip);
+  return { clip, ok };
+}
+
+/** Fresh, playable URL for a clip — existing signed/object URL, else re-sign. */
+export async function resolveClipUrl(clip: ReviewClip): Promise<string> {
+  if (clip.url && !clip.url.startsWith('blob:') && clip.url.includes('drs-clips')) {
+    return clip.url;
+  }
+  if (isSupabaseConfigured && clip.path) {
+    try {
+      const client = createClient();
+      const signed = await client.storage.from(CLIPS_BUCKET).createSignedUrl(clip.path, 3600);
+      if (!signed.error && signed.data?.signedUrl) return signed.data.signedUrl;
+    } catch {
+      /* keep the cached url as a fallback */
+    }
+  }
+  return clip.url || '';
 }
 
 async function currentUserId(): Promise<string> {
@@ -227,5 +282,40 @@ async function currentUserId(): Promise<string> {
     return data.user?.id ?? 'anon';
   } catch {
     return 'anon';
+  }
+}
+
+/** Persist the clip row into the Postgres journal (upsert by ball_id). */
+async function saveClipRow(clip: ReviewClip): Promise<void> {
+  if (!isSupabaseConfigured) return;
+  try {
+    const client = createClient();
+    await client.from('drs_clips').upsert(
+      {
+        ball_id: clip.ballId,
+        owner: (await currentUserId()) ?? 'anon',
+        path: clip.path,
+        name: clip.name,
+        size: clip.size,
+        mime: clip.mime,
+        duration_ms: clip.durationMs,
+        url: clip.url,
+        captured_at: new Date(clip.capturedAt).toISOString(),
+      },
+      { onConflict: 'ball_id' },
+    );
+  } catch {
+    /* remote unavailable — the localStorage index still covers this device */
+  }
+}
+
+/** Remove the clip row from the Postgres journal for `ballId`. */
+async function deleteClipRow(ballId: string): Promise<void> {
+  if (!isSupabaseConfigured) return;
+  try {
+    const client = createClient();
+    await client.from('drs_clips').delete().eq('ball_id', ballId);
+  } catch {
+    /* remote unavailable */
   }
 }

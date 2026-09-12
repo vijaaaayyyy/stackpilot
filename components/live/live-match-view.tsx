@@ -42,6 +42,7 @@ import {
 } from '@/lib/drs/trajectory';
 import { cn } from '@/lib/utils';
 import { ClipRecorder, uploadClip } from '@/lib/drs/clips';
+import { saveDraftReview } from '@/lib/drs/store';
 
 type Delivery = {
   over: string;
@@ -589,8 +590,10 @@ export function LiveMatchView({
     setReviewOpen(true);
   };
 
-  /* Cut the last ~15s of the phone's rolling capture (the final delivery) and
-     upload it as ball <delivery.over>. Returns the ball id, or null on failure. */
+  /* Cut the last <keepSeconds> of the phone's rolling capture (the final
+     delivery), upload it to drs-clips as {match}/{ball}.webm, and write the
+     draft drs_reviews row. The rolling buffer keeps recording for the next
+     delivery. Returns the ball id, or null on failure. */
   const captureLastDelivery = useCallback(
     async (keepSeconds = 15): Promise<string | null> => {
       const camNow = camRecorderRef.current;
@@ -600,19 +603,25 @@ export function LiveMatchView({
       }
       setCamSaving(true);
       try {
-        const blob = await camNow.stop(true, keepSeconds);
-        if (!blob) throw new Error('Nothing was captured');
-        const { ok } = await uploadClip(blob, delivery.over, {
+        const blob = camNow.snapshot(keepSeconds);
+        if (!blob) throw new Error('Nothing was captured — recording is less than a couple of seconds old.');
+        const { clip, ok } = await uploadClip(blob, delivery.over, {
+          matchId,
           durationMs: Math.round(camNow.seconds * 1000),
         });
+        if (ok) {
+          await saveDraftReview({
+            matchId,
+            matchLabel,
+            ballId: delivery.over,
+            clipPath: clip.path,
+          });
+        }
         setCamUpload({
           status: 'done',
           ball: delivery.over,
           message: ok ? 'Uploaded to the drs-clips bucket.' : 'Saved on this device — no storage bucket yet.',
         });
-        setCamOn(false);
-        setCamStream(null);
-        setCamSeconds(0);
         return delivery.over;
       } catch (error) {
         setCamUpload({
@@ -624,7 +633,7 @@ export function LiveMatchView({
         setCamSaving(false);
       }
     },
-    [delivery.over],
+    [delivery.over, matchId, matchLabel],
   );
 
   const goReview = async (type: string) => {
@@ -1223,8 +1232,9 @@ export function LiveMatchView({
           <p className="mt-3 text-[11px] leading-relaxed text-muted-foreground">
             {camOn ? (
               <>
-                Rolling capture is on —{' '}
-                <span className="text-rose-300">review or upload cuts the last 15 seconds</span> of the delivery.
+                Rolling capture stays on —{' '}
+              <span className="text-rose-300">review or upload cuts the last 15 seconds</span>{' '}
+              and keeps recording for the next delivery.
               </>
             ) : (
               <>Start recording before the ball is bowled so the last delivery can be cut and uploaded.</>

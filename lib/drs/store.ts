@@ -12,10 +12,10 @@ type ReviewRow = {
   match_id: string;
   match_label: string;
   ball_id: string;
-  type: ReviewTypeId;
-  on_field: Decision | 'SIX';
-  decision: Decision;
-  status: ReviewStatus;
+  type: ReviewTypeId | null;
+  on_field: Decision | 'SIX' | null;
+  decision: Decision | null;
+  status: ReviewStatus | null;
   reason: string;
   created_at: string;
   clip_path: string | null;
@@ -27,11 +27,11 @@ function fromRow(row: ReviewRow): Review {
     matchId: row.match_id,
     matchLabel: row.match_label,
     ballId: row.ball_id,
-    type: row.type,
-    onField: row.on_field,
-    decision: row.decision,
-    status: row.status,
-    reason: row.reason,
+    type: row.type ?? 'lbw',
+    onField: row.on_field ?? 'INCONCLUSIVE',
+    decision: row.decision ?? 'INCONCLUSIVE',
+    status: row.status ?? 'INCONCLUSIVE',
+    reason: row.reason ?? '',
     createdAt: new Date(row.created_at).getTime(),
     userEmail: row.user_email ?? undefined,
     userName: row.user_name ?? undefined,
@@ -120,18 +120,57 @@ export async function saveReview(review: Review): Promise<void> {
       const sessionEmail = data.user?.email ?? null;
       const sessionName =
         typeof data.user?.user_metadata?.name === 'string' ? data.user.user_metadata.name : null;
+      /* Preferences the draft row created on the capture tap so the umpire's
+         call lands on the same (match_id, ball_id) record. */
+      const existing = await client
+        .from('drs_reviews')
+        .select('id, user_id')
+        .eq('match_id', review.matchId)
+        .eq('ball_id', review.ballId)
+        .limit(1);
+      const existingRow = existing.data?.[0];
       await client.from('drs_reviews').upsert({
         ...toRow(review),
-        id: review.id,
-        user_id: data.user?.id ?? null,
+        id: existingRow?.id ?? review.id,
+        user_id: existingRow?.user_id ?? data.user?.id ?? null,
         user_email: review.userEmail ?? sessionEmail,
-        user_name: review.userName ?? sessionName,
+        user_name: review.userName ?? (existingRow ? undefined : sessionName),
       });
     } catch {
       /* remote unavailable — review is kept in the local journal */
     }
   }
   notifyChanged();
+}
+
+/** Draft row created on the "Review" tap — clip_path set, call fields left null. */
+export async function saveDraftReview(input: {
+  matchId: string;
+  matchLabel: string;
+  ballId: string;
+  clipPath: string;
+}): Promise<void> {
+  if (!isSupabaseConfigured) return;
+  try {
+    const client = createClient();
+    const { data } = await client.auth.getUser();
+    const user = data.user ?? null;
+    await client.from('drs_reviews').upsert(
+      {
+        match_id: input.matchId,
+        match_label: input.matchLabel,
+        ball_id: input.ballId,
+        clip_path: input.clipPath,
+        user_id: user?.id ?? null,
+        user_email: user?.email ?? null,
+        user_name: typeof user?.user_metadata?.name === 'string' ? user.user_metadata.name : null,
+        reason: '',
+      },
+      { onConflict: 'match_id,ball_id' },
+    );
+  } catch {
+    /* remote unavailable — the clip is still cached locally */
+  }
 }
 
 export async function clearReviews(): Promise<void> {

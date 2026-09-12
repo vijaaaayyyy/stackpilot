@@ -28,7 +28,7 @@ import {
 } from '@/lib/drs/trajectory';
 import { demoService, onFieldFor, reasonFor } from '@/lib/drs/demo-service';
 import { saveReview } from '@/lib/drs/store';
-import { deleteClip, getClip, type ReviewClip } from '@/lib/drs/clips';
+import { deleteClip, getClip, resolveClipUrl, type ReviewClip } from '@/lib/drs/clips';
 import { FootageCapture } from '@/components/review/footage-capture';
 import { FootagePlayer } from '@/components/review/footage-player';
 import type { Decision, Review, ReviewEvidence, ReviewTypeId } from '@/lib/drs/types';
@@ -131,6 +131,7 @@ export function ReviewWorkstation({
   const [overlays, setOverlays] = useState(false);
   const [flash, setFlash] = useState<string | null>(null);
   const [clip, setClip] = useState<ReviewClip | null>(null);
+  const [clipSrc, setClipSrc] = useState('');
   const [footageOpen, setFootageOpen] = useState(false);
 
   const progressRef = useRef(0);
@@ -174,6 +175,21 @@ export function ReviewWorkstation({
       window.removeEventListener('turf-drs:clip-detached', onDetach);
     };
   }, [ball]);
+
+  /* Resolve a playable URL for the private bucket (re-signs once expired). */
+  useEffect(() => {
+    let active = true;
+    if (!clip) {
+      setClipSrc('');
+      return;
+    }
+    resolveClipUrl(clip).then((url) => {
+      if (active) setClipSrc(url);
+    });
+    return () => {
+      active = false;
+    };
+  }, [clip]);
 
   const flashFor = useCallback((text: string, ms = 1100) => {
     setFlash(text);
@@ -426,11 +442,19 @@ export function ReviewWorkstation({
     <div className="space-y-2">
       {clip ? (
         <>
-          <FootagePlayer src={clip.url} title={`Ball ${ball}`} />
+          {clipSrc ? (
+            <FootagePlayer src={clipSrc} title={`Ball ${ball}`} />
+          ) : (
+            <div className="flex aspect-video w-full items-center justify-center rounded-lg border border-white/10 bg-black">
+              <span className="font-mono text-[10px] uppercase tracking-widest text-white/40">
+                Loading clip…
+              </span>
+            </div>
+          )}
           <p className="text-[10px] leading-relaxed text-white/45">
             {clip.url.startsWith('blob:')
               ? 'Saved on this device. No storage bucket yet — set up drs-clips to keep it in the cloud.'
-              : 'Uploaded to the drs-clips bucket.'}
+              : 'Uploaded to the drs-clips bucket (private, signed URL).'}
           </p>
           <button
             type="button"
@@ -445,7 +469,7 @@ export function ReviewWorkstation({
           </button>
         </>
       ) : (
-        <FootageCapture ballId={ball} initial={null} onClip={setClip} />
+        <FootageCapture ballId={ball} matchId={matchId} initial={null} onClip={setClip} />
       )}
     </div>
   );

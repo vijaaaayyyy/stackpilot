@@ -29,6 +29,10 @@ const STUMP_Z = 4.35;
 const STUMP_HEIGHT = 0.71;
 const CREASE_Z = 3.95;
 
+/* Front face of the batter stumps — where a hitting ball connects. */
+const STUMP_FACE_Z = STUMP_Z - BALL_RADIUS - 0.012;
+const BAIL_GROOVE_Y = STUMP_HEIGHT + 0.012;
+
 /* "Pitched in line" corridor — the zone between the two sets of stumps. The
    two rails sit just outside the outer stumps (stump spread is 0.22), so the
    band reads as "between the stumps". */
@@ -117,6 +121,12 @@ function makeWoodTexture(light = '#cf9f72', dark = '#8a5a2b'): THREE.CanvasTextu
  * Meshes tagged userData.highlight are the ones that pulse when the verdict is
  * "hitting".
  */
+/**
+ * Realistic stump set: three tapered wood stumps with a broadcast ring and a
+ * dark base skirt, plus two bails (barrel + knobs) resting in the grooves.
+ * Stump pivots are tagged userData.knock, bail pivots userData.bail, and the
+ * wood meshes userData.highlight so the verdict pulse stays on the wood only.
+ */
 function makeStumps(): THREE.Group {
   const group = new THREE.Group();
   const woodTex = makeWoodTexture();
@@ -124,43 +134,53 @@ function makeStumps(): THREE.Group {
   const darkWood = new THREE.MeshStandardMaterial({ color: '#6f4527', roughness: 0.9 });
   const bailMat = new THREE.MeshStandardMaterial({ map: woodTex, color: 0xffffff, roughness: 0.35, metalness: 0.05 });
 
-  const GROOVE_Y = STUMP_HEIGHT + 0.012;
-
+  /* Each stump sits on a pivot at ground level (y=0) so the knock-over
+     animation rotates it around its planted base. Bails get their own pivot
+     so they can fly off when the stumps fall. */
   const makeStump = (x: number, jitter: number) => {
+    const pivot = new THREE.Group();
+    pivot.position.set(x, 0, jitter);
+    pivot.userData.knock = true;
+    group.add(pivot);
+
     const stump = new THREE.Mesh(
       new THREE.CylinderGeometry(0.041, 0.052, STUMP_HEIGHT, 20),
       wood,
     );
-    stump.position.set(x, STUMP_HEIGHT / 2, jitter);
+    stump.position.set(0, STUMP_HEIGHT / 2, 0);
     stump.userData.highlight = true;
-    group.add(stump);
+    pivot.add(stump);
 
     /* Broadcast ring near the top */
     const ring = new THREE.Mesh(new THREE.TorusGeometry(0.047, 0.011, 8, 24), darkWood);
     ring.rotation.x = Math.PI / 2;
-    ring.position.set(x, STUMP_HEIGHT - 0.05, jitter);
-    group.add(ring);
+    ring.position.set(0, STUMP_HEIGHT - 0.05, 0);
+    pivot.add(ring);
 
     /* Dark base skirt */
     const base = new THREE.Mesh(new THREE.CylinderGeometry(0.052, 0.056, 0.09, 20), darkWood);
-    base.position.set(x, 0.045, jitter);
-    group.add(base);
+    base.position.set(0, 0.045, 0);
+    pivot.add(base);
   };
   makeStump(-0.112, 0.01);
   makeStump(0, -0.008);
   makeStump(0.112, 0.006);
 
   const makeBail = (x: number) => {
+    const pivot = new THREE.Group();
+    pivot.position.set(x, BAIL_GROOVE_Y, 0);
+    pivot.userData.bail = true;
+    group.add(pivot);
+
     const barrel = new THREE.Mesh(new THREE.CylinderGeometry(0.0145, 0.0145, 0.145, 12), bailMat);
     barrel.rotation.z = Math.PI / 2;
-    barrel.position.set(x, GROOVE_Y, 0);
     barrel.userData.highlight = true;
-    group.add(barrel);
+    pivot.add(barrel);
     [-0.0775, 0.0775].forEach((dx) => {
       const knob = new THREE.Mesh(new THREE.SphereGeometry(0.021, 12, 10), bailMat);
-      knob.position.set(x + dx, GROOVE_Y, 0);
+      knob.position.set(dx, 0, 0);
       knob.userData.highlight = true;
-      group.add(knob);
+      pivot.add(knob);
     });
   };
   makeBail(-0.056);
@@ -510,9 +530,24 @@ export function ThreeDrsScene({
       }
       controls.update();
 
-      /* Ball */
-      const p = atImpact ? PAD : deliveryPosition(outcome, s.progress);
-      ball.position.set(toWorldX(p.x), toWorldY(outcome, s.progress), toWorldZ(p.y));
+      /* Ball — before impact it follows the delivery; a hitting LBW carries
+         on through to the stumps and connects with the front face. */
+      const destroy = s.type === 'lbw' && s.verdict === 'hitting';
+      let ballPos: THREE.Vector3;
+      if (destroy && s.progress > IMPACT_T) {
+        const u = Math.min((s.progress - IMPACT_T) / (1 - IMPACT_T), 1);
+        const ez = u * u * (3 - 2 * u);
+        const padP = padWorld();
+        ballPos = new THREE.Vector3(
+          padP.x,
+          padP.y + (0.34 - padP.y) * ez,
+          padP.z + (STUMP_FACE_Z - padP.z) * ez,
+        );
+      } else {
+        const p = atImpact ? PAD : deliveryPosition(outcome, s.progress);
+        ballPos = new THREE.Vector3(toWorldX(p.x), toWorldY(outcome, s.progress), toWorldZ(p.y));
+      }
+      ball.position.copy(ballPos);
 
       /* Trail subset */
       const visibleCount = Math.max(2, Math.round(s.progress * (SAMPLE_COUNT - 1)) + 1);
@@ -535,7 +570,7 @@ export function ThreeDrsScene({
       projection.visible = showProjection;
       projectionTip.visible = showProjection && !atImpact;
       const hitting = showProjection && s.verdict === 'hitting';
-      batterStumps.children.forEach((child) => {
+      batterStumps.traverse((child) => {
         if (child instanceof THREE.Mesh && child.userData.highlight) {
           const mat = child.material as THREE.MeshStandardMaterial;
           if (hitting) {
@@ -544,6 +579,29 @@ export function ThreeDrsScene({
           } else {
             mat.emissive.setHex(0x000000);
             mat.emissiveIntensity = 0;
+          }
+        }
+      });
+
+      /* Stump destruction — deterministic from progress, reverses on replay.
+         Stumps topple around their planted base, bails fly up and forward. */
+      const fallU = Math.min(Math.max((s.progress - IMPACT_T) / (1 - IMPACT_T), 0), 1);
+      const fall = fallU * fallU * (3 - 2 * fallU);
+      const destroying = destroy && fall > 0;
+      batterStumps.children.forEach((child, i) => {
+        if (child.userData.knock) {
+          child.rotation.x = destroying ? -fall * (i % 3 === 1 ? 1.35 : i % 3 === 0 ? 1.0 : 0.85) : 0;
+        } else if (child.userData.bail) {
+          if (destroying) {
+            child.position.z = fall * 0.55;
+            child.position.y = BAIL_GROOVE_Y + Math.sin(Math.min(fall * 1.7, 1) * Math.PI) * 0.2 + (0.02 - BAIL_GROOVE_Y) * fall;
+            child.rotation.x = -fall * 1.4;
+            child.rotation.z = -fall * 1.1;
+          } else {
+            child.position.z = 0;
+            child.position.y = BAIL_GROOVE_Y;
+            child.rotation.x = 0;
+            child.rotation.z = 0;
           }
         }
       });

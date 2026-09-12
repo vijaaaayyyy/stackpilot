@@ -89,7 +89,7 @@ export function Footer() {
             © {new Date().getFullYear()} Turf DRS. All rights reserved.
           </p>
           <p className="text-xs text-muted-foreground">
-            Built for developers, by developers with LOVE!.
+            Made for the love of the game.
           </p>
         </div>
       </div>

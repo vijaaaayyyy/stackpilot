@@ -9,7 +9,7 @@ export default function SignupPage() {
     <AuthCard
       eyebrow="Get started"
       title="Create your account"
-      subtitle="Save stacks to the cloud, merge your local work, and build with confidence."
+      subtitle="Run matches, keep squads, and re-watch the close ones from anywhere."
       footer={
         <>
           Already have an account?{' '}

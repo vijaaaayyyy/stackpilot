@@ -5,54 +5,53 @@ import { Footer } from '@/components/landing/footer';
 
 export const metadata: Metadata = {
   title: 'Changelog',
-  description: 'Recent updates, improvements, and fixes to Stack2Set.',
+  description: 'Recent updates, improvements, and fixes to Turf DRS.',
   alternates: { canonical: '/changelog' },
 };
 
 const entries = [
   {
-    version: '2.4.1',
+    version: '4.5.0',
+    date: 'September 2026',
+    items: [
+      '3D replay scene with umpire and top camera views',
+      'Turf DRS Explore and Browse pages',
+      'New review types: LBW, run out, stumping, caught behind, boundary',
+      'Venue guide with camera-ready grounds',
+    ],
+  },
+  {
+    version: '4.0.0',
     date: 'August 2026',
     items: [
-      'New floating badges on the homepage',
-      'Redesigned feature cards with gradient borders',
-      'FAQ section with search and filters on the homepage',
-      'Full documentation site with sidebar, TOC, and code highlighting',
-      'New static pages: features, explore, compare, pricing, and more',
+      'Live ball tracking with trajectory projection',
+      'Decision review workstation for the third umpire',
+      'Squad and academy management',
+      'Robots.txt and sitemap.xml for discoverability',
     ],
   },
   {
-    version: '2.1.0',
+    version: '3.0.0',
     date: 'July 2026',
     items: [
-      'Top 6 ranked providers per category with best use cases',
-      'Provider website and documentation links in results',
-      'Robots.txt, sitemap.xml, and llms.txt for discoverability',
-      'Structured data (JSON-LD) across the site',
+      'Auto-capture for every delivery from the end camera',
+      'Slow-motion and frame-by-frame replay',
+      'In-browser 3D pitch map and impact markers',
     ],
   },
   {
-    version: '1.2.0',
-    date: 'June 2026',
-    items: [
-      'AI provider fallback when static data is missing',
-      'Fixed category navigation bug',
-      'Improved loading screen with progress steps',
-    ],
-  },
-  {
-    version: '1.1.0',
+    version: '2.0.0',
     date: 'May 2026',
     items: [
-      'Gemini-powered analysis of project descriptions',
-      'Category pages with ranked providers',
-      'Compare providers across technology categories',
+      'Run out and stumping reviews with crease timing',
+      'Camera rig setup and calibration guide',
+      'Match records for turf, academies and clubs',
     ],
   },
   {
     version: '1.0.0',
     date: 'April 2026',
-    items: ['Initial release of Stack2Set', 'Core search and results experience'],
+    items: ['Initial release of Turf DRS', 'Core live demo with ball tracking'],
   },
 ];
 
@@ -69,7 +68,7 @@ export default function ChangelogPage() {
             What&apos;s <span className="gradient-text">new</span>
           </h1>
           <p className="mx-auto mt-4 max-w-xl text-base leading-relaxed text-muted-foreground sm:text-lg">
-            Recent updates, improvements, and fixes to Stack2Set.
+            Recent updates, improvements, and fixes to Turf DRS.
           </p>
         </header>
 

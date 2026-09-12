@@ -5,7 +5,7 @@ import { siteConfig, absoluteUrl } from '@/lib/site';
 export const metadata: Metadata = {
   title: 'Search',
   description:
-    'Describe your project and Stack2Set will build your technology stack. Sign in to generate personalized results.',
+    'Describe your project and Turf DRS will build your technology stack. Sign in to generate personalized results.',
   alternates: {
     canonical: '/search',
   },
@@ -18,7 +18,7 @@ export const metadata: Metadata = {
     url: absoluteUrl('/search'),
     title: 'Search',
     description:
-      'Describe your project and Stack2Set will build your technology stack.',
+      'Describe your project and Turf DRS will build your technology stack.',
     siteName: siteConfig.openGraph.siteName,
     locale: siteConfig.openGraph.locale,
     images: [{ url: absoluteUrl('/og.png'), width: 1200, height: 630, alt: siteConfig.name }],
@@ -27,7 +27,7 @@ export const metadata: Metadata = {
     card: 'summary_large_image',
     title: 'Search',
     description:
-      'Describe your project and Stack2Set will build your technology stack.',
+      'Describe your project and Turf DRS will build your technology stack.',
     images: [absoluteUrl('/og.png')],
   },
 };

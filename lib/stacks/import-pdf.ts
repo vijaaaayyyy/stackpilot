@@ -106,7 +106,7 @@ export function parseStackFromPdfText(text: string): UserStack | null {
 
   const prompt = summaryIndex > 1 ? lines[1] : '';
 
-  const META_PREFIXES = ['Why:', 'Pricing:', 'Popularity:', 'Tags:', 'Links:', 'Built with Stack2Set'];
+  const META_PREFIXES = ['Why:', 'Pricing:', 'Popularity:', 'Tags:', 'Links:', 'Built with Stack2Set', 'Built with Turf DRS'];
 
   const providerHeadings = lines
     .slice(summaryIndex + 1)
@@ -221,7 +221,7 @@ export function parseStackFromPdfText(text: string): UserStack | null {
       continue;
     }
 
-    if (line.startsWith('Built with Stack2Set')) continue;
+    if (line.startsWith('Built with')) continue;
 
     currentProvider.description = currentProvider.description
       ? `${currentProvider.description} ${line}`

@@ -3,25 +3,22 @@ import Link from 'next/link';
 import {
   ArrowRight,
   BookOpen,
-  GitCompare,
-  Sparkles,
-  Terminal,
-  ListChecks,
-  GraduationCap,
-  Lightbulb,
+  Camera,
   FileText,
   HelpCircle,
+  ListChecks,
+  MapPin,
+  PlayCircle,
+  Sparkles,
 } from 'lucide-react';
-import { CodeBlock } from '@/components/docs/code-block';
 import { siteConfig } from '@/lib/site';
-import { docGroups } from '@/lib/docs';
-import { categories } from '@/lib/categories';
+import { DRS_REVIEW_TYPES } from '@/lib/drs/browse';
 import { breadcrumbSchema, serializeJsonLd } from '@/lib/jsonld';
 
 export const metadata: Metadata = {
   title: 'Documentation',
   description:
-    'Learn how to use Stack2Set: describe your project, review AI-recommended technology categories, compare providers, and build your tech stack.',
+    'Learn how to use Turf DRS: set up the end camera, run LBW, run out and caught behind reviews, use ball tracking, and manage matches on your turf.',
   alternates: {
     canonical: '/docs',
   },
@@ -29,29 +26,14 @@ export const metadata: Metadata = {
     type: 'website',
     title: `Documentation — ${siteConfig.name}`,
     description:
-      'Learn how to use Stack2Set to discover and assemble the perfect technology stack for your project.',
+      'Learn how to set up Turf DRS, run decision reviews, and manage matches on your turf.',
   },
 };
 
-const quickStartCode = `# 1. Describe your project on the homepage
-"I want to build a YouTube clone"
-
-# 2. Stack2Set analyzes it with AI
-# 3. Review categories, compare providers
-# 4. Build and export your stack`;
-
-const tutorialLinks = [
-  { slug: 'getting-started', title: 'Getting Started', description: 'Your first stack in three steps' },
-  { slug: 'search', title: 'Search', description: 'Write better project descriptions' },
-  { slug: 'compare', title: 'Compare', description: 'Pick the right provider' },
-  { slug: 'deployment', title: 'Deployment', description: 'Ship your stack to production' },
-];
-
-const bestPracticeLinks = [
-  { slug: 'databases', title: 'Choose the right database', description: 'SQL, NoSQL, vector and real-time' },
-  { slug: 'authentication', title: 'Set up authentication early', description: 'Avoid painful migrations later' },
-  { slug: 'cloud', title: 'Start with managed services', description: 'Move faster with less ops' },
-];
+const quickStartCode = `# 1. Open the live demo match
+# 2. Point the end camera at the stumps
+# 3. Run an LBW or run out review
+# 4. Settle the call with slow-mo + ball tracking`;
 
 export default function DocsPage() {
   const jsonLd = breadcrumbSchema([{ name: 'Docs', url: '/docs' }]);
@@ -66,126 +48,50 @@ export default function DocsPage() {
         <header className="text-center">
           <p className="text-sm font-medium text-teal-400">Documentation</p>
           <h1 className="mt-3 text-balance text-3xl font-semibold tracking-tight text-foreground sm:text-5xl">
-            Build smarter with <span className="gradient-text">Stack2Set</span>
+            Settle it right with <span className="gradient-text">Turf DRS</span>
           </h1>
           <p className="mx-auto mt-4 max-w-xl text-base text-muted-foreground sm:text-lg">
-            Everything you need to discover, compare, and assemble the perfect technology stack.
+            Everything you need to run decision reviews, set up cameras, and manage matches on
+            your turf, at your academy, or in your league.
           </p>
         </header>
 
         <section className="mt-16">
           <h2 className="flex items-center gap-2 text-sm font-semibold uppercase tracking-wider text-muted-foreground">
-            <Sparkles className="h-4 w-4 text-teal-400" />
-            Popular topics
-          </h2>
-          <div className="mt-4 grid gap-4 sm:grid-cols-2">
-            {docGroups[0].items.map((item) => (
-              <Link
-                key={item.slug}
-                href={`/docs/${item.slug}`}
-                className="group glass glass-hover rounded-2xl p-5 transition-all hover:-translate-y-0.5"
-              >
-                <BookOpen className="h-5 w-5 text-teal-400" />
-                <h3 className="mt-3 text-sm font-semibold text-foreground">{item.title}</h3>
-                <p className="mt-1 text-sm text-muted-foreground">{item.description}</p>
-                <span className="mt-3 inline-flex items-center gap-1 text-xs font-medium text-teal-400 opacity-0 transition-opacity group-hover:opacity-100">
-                  Read guide <ArrowRight className="h-3 w-3" />
-                </span>
-              </Link>
-            ))}
-          </div>
-        </section>
-
-        <section className="mt-16">
-          <h2 className="flex items-center gap-2 text-sm font-semibold uppercase tracking-wider text-muted-foreground">
-            <Terminal className="h-4 w-4 text-teal-400" />
+            <PlayCircle className="h-4 w-4 text-teal-400" />
             Quick start
           </h2>
           <p className="mt-3 text-sm text-muted-foreground">
-            Get from idea to a full technology stack in under a minute. No account, no setup, no
-            credit card.
+            Go from zero to a settled review in under a minute on the live demo match. No account,
+            no setup, no credit card.
           </p>
-          <CodeBlock code={quickStartCode} language="bash" />
+          <div className="mt-4 overflow-hidden rounded-xl border border-foreground/5 bg-foreground/[0.03] p-5 font-mono text-[13px] leading-relaxed text-foreground/80">
+            {quickStartCode}
+          </div>
         </section>
 
         <section className="mt-16">
           <h2 className="flex items-center gap-2 text-sm font-semibold uppercase tracking-wider text-muted-foreground">
             <ListChecks className="h-4 w-4 text-teal-400" />
-            Categories
+            Review types
           </h2>
           <p className="mt-3 text-sm text-muted-foreground">
-            Browse recommended providers for each technology category.
+            Every decision Turf DRS can settle — pick one to see the evidence chain and how the
+            demo runs.
           </p>
-          <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-            {categories.map((cat) => (
-              <Link
-                key={cat.id}
-                href={`/browse/categories/${cat.id}`}
-                className="glass glass-hover flex items-center gap-3 rounded-xl p-3.5 transition-all hover:-translate-y-0.5"
-              >
-                <span
-                  className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-gradient-to-br ${cat.gradient}`}
-                >
-                  <cat.icon className={`h-4.5 w-4.5 ${cat.iconColor}`} />
-                </span>
-                <span className="min-w-0">
-                  <span className="block truncate text-sm font-medium text-foreground">
-                    {cat.name}
-                  </span>
-                  <span className="block truncate text-xs text-muted-foreground">
-                    {cat.providers} providers
-                  </span>
-                </span>
-              </Link>
-            ))}
-          </div>
-        </section>
-
-        <section className="mt-16">
-          <h2 className="flex items-center gap-2 text-sm font-semibold uppercase tracking-wider text-muted-foreground">
-            <GitCompare className="h-4 w-4 text-teal-400" />
-            API reference
-          </h2>
-          <div className="mt-4 flex items-center justify-between gap-4 rounded-2xl glass p-6">
-            <div>
-              <h3 className="text-base font-semibold text-foreground">Analyze endpoint</h3>
-              <p className="mt-1 text-sm text-muted-foreground">
-                Send a project description and get a ranked technology stack back.
-              </p>
-            </div>
-            <Link
-              href="/docs/api"
-              className="inline-flex shrink-0 items-center gap-2 rounded-xl bg-teal-500 px-4 py-2.5 text-sm font-medium text-white transition-opacity hover:opacity-90"
-            >
-              View reference <ArrowRight className="h-4 w-4" />
-            </Link>
-          </div>
-          <div className="mt-4 rounded-2xl border border-foreground/5 bg-foreground/[0.02] p-6">
-            <p className="text-sm text-muted-foreground">
-              Compare providers on any category page — ranked by fit, with best use cases, free
-              tiers, and open-source indicators.
-            </p>
-          </div>
-        </section>
-
-        <section className="mt-16">
-          <h2 className="flex items-center gap-2 text-sm font-semibold uppercase tracking-wider text-muted-foreground">
-            <GraduationCap className="h-4 w-4 text-teal-400" />
-            Tutorials
-          </h2>
           <div className="mt-4 grid gap-3 sm:grid-cols-2">
-            {tutorialLinks.map((link) => (
+            {DRS_REVIEW_TYPES.map((item) => (
               <Link
-                key={link.slug}
-                href={`/docs/${link.slug}`}
+                key={item.slug}
+                href={`/browse/categories/${item.slug}`}
                 className="group flex items-start gap-3 rounded-2xl glass p-4 transition-all hover:-translate-y-0.5"
               >
                 <BookOpen className="mt-0.5 h-4 w-4 shrink-0 text-teal-400" />
                 <span>
                   <span className="block text-sm font-semibold text-foreground group-hover:text-teal-400">
-                    {link.title}
+                    {item.name}
                   </span>
-                  <span className="block text-xs text-muted-foreground">{link.description}</span>
+                  <span className="block text-xs text-muted-foreground">{item.short}</span>
                 </span>
               </Link>
             ))}
@@ -194,19 +100,63 @@ export default function DocsPage() {
 
         <section className="mt-16">
           <h2 className="flex items-center gap-2 text-sm font-semibold uppercase tracking-wider text-muted-foreground">
-            <Lightbulb className="h-4 w-4 text-teal-400" />
-            Best practices
+            <Camera className="h-4 w-4 text-teal-400" />
+            Camera setup
           </h2>
           <div className="mt-4 grid gap-3 sm:grid-cols-2">
-            {bestPracticeLinks.map((link) => (
+            <Link
+              href="/cameras"
+              className="group flex items-start gap-3 rounded-2xl glass p-4 transition-all hover:-translate-y-0.5"
+            >
+              <Camera className="mt-0.5 h-4 w-4 shrink-0 text-teal-400" />
+              <span>
+                <span className="block text-sm font-semibold text-foreground group-hover:text-teal-400">
+                  The camera rig
+                </span>
+                <span className="block text-xs text-muted-foreground">
+                  End camera, top camera and the third angle
+                </span>
+              </span>
+            </Link>
+            <Link
+              href="/browse/categories/cameras"
+              className="group flex items-start gap-3 rounded-2xl glass p-4 transition-all hover:-translate-y-0.5"
+            >
+              <Sparkles className="mt-0.5 h-4 w-4 shrink-0 text-teal-400" />
+              <span>
+                <span className="block text-sm font-semibold text-foreground group-hover:text-teal-400">
+                  Camera review type
+                </span>
+                <span className="block text-xs text-muted-foreground">
+                  Calibration steps for a two-camera rig
+                </span>
+              </span>
+            </Link>
+          </div>
+        </section>
+
+        <section className="mt-16">
+          <h2 className="flex items-center gap-2 text-sm font-semibold uppercase tracking-wider text-muted-foreground">
+            <MapPin className="h-4 w-4 text-teal-400" />
+            Venues
+          </h2>
+          <p className="mt-3 text-sm text-muted-foreground">
+            Turf grounds, net facilities and club ovals set up to run Turf DRS — from permanent
+            rigs to a portable end camera.
+          </p>
+          <div className="mt-4 grid gap-3 sm:grid-cols-2">
+            {[
+              { title: 'Browse venues', description: 'See the grounds on Turf DRS', href: '/browse/providers' },
+              { title: 'Featured: Serenity Turf Arena', description: 'Open turf, end + top rig', href: '/browse/providers/serenity-turf' },
+            ].map((link) => (
               <Link
-                key={link.slug}
-                href={`/docs/${link.slug}`}
+                key={link.href}
+                href={link.href}
                 className="group flex items-start gap-3 rounded-2xl glass p-4 transition-all hover:-translate-y-0.5"
               >
-                <Lightbulb className="mt-0.5 h-4 w-4 shrink-0 text-amber-400" />
+                <MapPin className="mt-0.5 h-4 w-4 shrink-0 text-teal-400" />
                 <span>
-                  <span className="block text-sm font-semibold text-foreground group-hover:text-amber-400">
+                  <span className="block text-sm font-semibold text-foreground group-hover:text-teal-400">
                     {link.title}
                   </span>
                   <span className="block text-xs text-muted-foreground">{link.description}</span>

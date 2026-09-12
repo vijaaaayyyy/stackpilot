@@ -23,7 +23,7 @@ export function ShareActions({
     setTimeout(() => setCopied(false), 1500);
   };
 
-  const text = encodeURIComponent(`${title} — built with Stack2Set`);
+  const text = encodeURIComponent(`${title} — built with Turf DRS`);
   const encodedUrl = encodeURIComponent(url);
 
   const handlePrint = () => {

@@ -18,7 +18,7 @@ const PENDING_TTL_MS = 24 * 60 * 60 * 1000;
  * the callback URL stays a bare, allowlist-friendly path (Supabase matches the
  * full redirect URL against the dashboard allowlist, query params included).
  */
-export const AUTH_NEXT_COOKIE = 'stack2set:auth-next';
+export const AUTH_NEXT_COOKIE = 'turf-drs:auth-next';
 
 type StoredPendingQuery = {
   query: string;

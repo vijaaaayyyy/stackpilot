@@ -216,7 +216,7 @@ function BrandMark({ showLabel }: { showLabel: boolean }) {
             transition={{ duration: 0.15 }}
             className="whitespace-nowrap text-sm font-semibold text-foreground"
           >
-            Stack2Set
+            Turf DRS
           </motion.span>
         )}
       </AnimatePresence>

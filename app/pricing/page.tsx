@@ -1,66 +1,68 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
-import { Check, Sparkles, Rocket, Building2 } from 'lucide-react';
+import { Check, Clapperboard, Landmark, Sparkles } from 'lucide-react';
 import { Navbar } from '@/components/landing/navbar';
 import { Footer } from '@/components/landing/footer';
 import { CTA } from '@/components/landing/cta';
-import { PricingFreeTip } from '@/components/landing/pricing-free-tip';
 import { cn } from '@/lib/utils';
 
 export const metadata: Metadata = {
   title: 'Pricing',
   description:
-    'Stack2Set is free to use. Explore plans for individuals, startups, and teams — no credit card required.',
+    'Turf DRS is free to try. Simple plans for demo users, turf owners, and leagues and academies — no credit card required.',
   alternates: { canonical: '/pricing' },
 };
 
 const plans = [
   {
-    name: 'Free',
+    name: 'Free (Demo)',
     icon: Sparkles,
-    price: '$0',
+    price: '₹0',
     period: 'forever',
-    description: 'Everything you need to explore ideas and build your first stack.',
+    description: 'Try every review live on the demo match — no setup, no card required.',
     features: [
-      'Unlimited project analyses',
-      'AI-powered tech stack recommendations',
-      'Provider comparison across categories',
-      'Save and export your stack',
+      'Instant LBW, run out, stumping, caught & boundary reviews',
+      'Live ball tracking demo',
+      'Instant replay with slow motion',
+      'End camera and top camera views',
+      'Reviews saved on your device',
     ],
     highlighted: false,
-    cta: { label: 'Start for free', href: '/' },
+    cta: { label: 'Run a demo review', href: '/live?demo=1' },
   },
   {
-    name: 'Pro',
-    icon: Rocket,
-    price: '$9',
+    name: 'Turf Owner',
+    icon: Landmark,
+    price: '₹799',
     period: 'per month',
-    description: 'For developers building serious products and shipping to production.',
+    description: 'For turf owners running reviewable matches on their grounds.',
     features: [
-      'Everything in Free',
-      'Faster AI analysis',
-      'Priority provider data',
-      'Advanced stack comparisons',
-      'Team sharing of stacks',
+      'Everything in Free (Demo)',
+      'Unlimited matches at your turf',
+      'Teams, players and squads',
+      'Camera rig setup & calibration guide',
+      'Live ball tracking on every delivery',
+      'Venue profile on Turf DRS Browse',
     ],
     highlighted: true,
-    cta: { label: 'Go Pro', href: '/' },
+    cta: { label: 'Start your turf plan', href: '/signup?next=/dashboard' },
   },
   {
-    name: 'Team',
-    icon: Building2,
-    price: '$29',
+    name: 'League / Academy',
+    icon: Clapperboard,
+    price: '₹2,499',
     period: 'per month',
-    description: 'For teams standardizing their technology decisions together.',
+    description: 'For leagues and academies running decisions across many venues.',
     features: [
-      'Everything in Pro',
-      'Shared workspace & stacks',
-      'Team provider preferences',
-      'Usage analytics',
-      'Priority support',
+      'Everything in Turf Owner',
+      'Multi-team fixtures and standings',
+      'Reviews across all venues',
+      'Umpire and coach review access',
+      'Academy squad management',
+      'Priority onboarding & setup help',
     ],
     highlighted: false,
-    cta: { label: 'Contact us', href: '/contact' },
+    cta: { label: 'Talk to us', href: '/contact' },
   },
 ];
 
@@ -68,17 +70,17 @@ export default function PricingPage() {
   return (
     <main className="relative min-h-screen overflow-x-hidden">
       <Navbar />
-      <PricingFreeTip />
       <div className="relative overflow-hidden px-4 pb-24 pt-32 sm:px-6 sm:pt-36">
         <div className="pointer-events-none absolute left-1/2 top-0 -z-10 h-[400px] w-[700px] -translate-x-1/2 rounded-full bg-teal-500/10 blur-[120px]" />
 
         <header className="mx-auto max-w-3xl text-center">
           <p className="text-sm font-medium text-teal-400">Pricing</p>
           <h1 className="mt-3 text-balance text-3xl font-semibold tracking-tight text-foreground sm:text-5xl">
-            Start <span className="gradient-text">free</span>, scale when you&apos;re ready
+            Start <span className="gradient-text">free</span>, grow into a full review system
           </h1>
           <p className="mx-auto mt-4 max-w-xl text-base leading-relaxed text-muted-foreground sm:text-lg">
-            Stack2Set is free for everyone today. Simple plans for developers, startups, and teams.
+            Turf DRS is free to try today. Simple plans for your demo runs, your turf, or your
+            whole league and academy.
           </p>
         </header>
 
@@ -88,15 +90,15 @@ export default function PricingPage() {
               <Sparkles className="h-4 w-4 text-teal-400" />
             </span>
             <p className="text-sm text-muted-foreground">
-              Stack2Set is <span className="font-semibold text-teal-300">100% free</span> right
-              now — use it while it&apos;s free!
+              Turf DRS starts at <span className="font-semibold text-teal-300">₹0</span> — run the
+              demo reviews free, upgrade when your league is ready.
             </p>
           </div>
           <Link
-            href="/"
+            href="/live?demo=1"
             className="inline-flex h-10 shrink-0 items-center justify-center rounded-xl bg-teal-500 px-5 text-sm font-medium text-white shadow-lg shadow-teal-500/20 transition-all hover:bg-teal-600"
           >
-            Start building for free
+            Watch the live demo
           </Link>
         </div>
 

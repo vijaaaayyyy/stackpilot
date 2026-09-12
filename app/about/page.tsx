@@ -6,27 +6,27 @@ import { siteConfig } from '@/lib/site';
 export const metadata: Metadata = {
   title: 'About',
   description:
-    'Stack2Set uses AI to turn a project idea into a complete technology stack — discover, compare, and assemble the perfect stack in minutes.',
+    'Turf DRS brings professional decision review to local cricket — LBW, run out, stumping and boundary reviews for turf matches, academies and clubs.',
   alternates: { canonical: '/about' },
 };
 
 const sections = [
   {
     title: 'Our mission',
-    body: 'Choosing the right technology is the hardest part of starting any project. Stack2Set removes the guesswork by analyzing your idea and recommending a complete, production-ready stack — so you spend your time building, not researching.',
+    body: 'Close calls change games. Turf DRS gives local matches, turf grounds, academies and clubs the same slow-motion replays, ball tracking and frame-by-frame reviews that used to be reserved for broadcast cricket — so the right decision wins, every time.',
   },
   {
     title: 'What we believe',
     items: [
-      { title: 'Speed matters', body: 'The best stack is the one you can ship today. We recommend proven, production-ready options over endless alternatives.' },
-      { title: 'Explain every choice', body: 'Every recommendation comes with a reason, best use cases, and links to verify it yourself.' },
-      { title: 'Free for builders', body: 'Stack2Set is free to use. We believe great developer tools should be accessible to everyone.' },
-      { title: 'Open and honest', body: 'Providers are marked with free-tier and open-source indicators, so you always know what you are choosing.' },
+      { title: 'Reviews should be fast', body: 'A review runs in under 30 seconds. The game keeps moving while the third umpire settles it on clear, replayable evidence.' },
+      { title: 'Every decision counts', body: 'LBW, run out, stumping, boundary, edge, caught behind — the same call types professional cricket reviews, available on any turf.' },
+      { title: 'No broadcast budget needed', body: 'Any phone or camera at the umpire end works. Turf DRS handles auto-capture and slow-mo without expensive equipment.' },
+      { title: 'Open and honest', body: 'Turf DRS is an original, independent product — not affiliated with the ICC, IPL or Hawk-Eye — built for grassroots and academy cricket.' },
     ],
   },
   {
-    title: 'Built with Stack2Set',
-    body: `Stack2Set itself was built the way we recommend you build: ${siteConfig.name} is a Next.js application with AI-powered analysis, deployed and served at global edge.`,
+    title: 'Built with Turf DRS',
+    body: `${siteConfig.name} is a Next.js application with an in-browser 3D replay engine, live ball tracking, and a review workstation served from the edge.`,
   },
 ];
 
@@ -34,9 +34,9 @@ export default function AboutPage() {
   return (
     <StaticPage
       eyebrow="About"
-      title="The AI copilot for"
-      highlight="choosing your stack"
-      description={`${siteConfig.name} is an AI-powered developer tool that analyzes a project idea and recommends the best technologies, APIs, databases, authentication providers, hosting services, and developer tools to build it.`}
+      title="The local third umpire for"
+      highlight="every turf match"
+      description={`${siteConfig.name} is a professional-style decision review system for local cricket — capture the delivery, settle the close call, and keep the game fair.`}
       sections={sections}
     />
   );

@@ -158,7 +158,7 @@ function SaveToCloudDialog({
           {!user ? (
             <div className="space-y-3">
               <p className="text-sm leading-relaxed text-muted-foreground">
-                Saving to the cloud requires a free Stack2Set account. Your stack stays on this
+                Saving to the cloud requires a free Turf DRS account. Your stack stays on this
                 device until you sign in.
               </p>
               <Button
@@ -402,9 +402,9 @@ function WorkspaceContent() {
                   {!user
                     ? 'Changes are stored locally on this device'
                     : saveStatus === 'saving'
-                      ? 'Writing to your Stack2Set account'
+                      ? 'Writing to your Turf DRS account'
                       : saveStatus === 'saved'
-                        ? 'Changes are saved to your Stack2Set account'
+                        ? 'Changes are saved to your Turf DRS account'
                         : cloudSynced
                           ? 'Click Save Stack to store it in your account'
                           : 'Syncing your stacks...'}

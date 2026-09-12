@@ -1,5 +1,4 @@
 import type { Metadata } from 'next';
-import Link from 'next/link';
 import { ArrowRight, CalendarDays, Clock } from 'lucide-react';
 import { Navbar } from '@/components/landing/navbar';
 import { Footer } from '@/components/landing/footer';
@@ -7,55 +6,55 @@ import { Footer } from '@/components/landing/footer';
 export const metadata: Metadata = {
   title: 'Blog',
   description:
-    'Guides and insights on building technology stacks: choosing databases, auth, cloud providers, and shipping to production.',
+    'Guides and insights on local cricket reviews: LBW and run out decisions, camera setup, ball tracking, and running a Turf DRS match.',
   alternates: { canonical: '/blog' },
 };
 
 const posts = [
   {
-    title: 'How to choose the right database for your app',
+    title: 'Setting up the umpire-end camera',
     date: 'August 2026',
     readTime: '6 min',
     excerpt:
-      'Relational, document, vector, or real-time? A practical framework for picking a database you won’t regret.',
-    href: '/docs/databases',
-    tag: 'Databases',
+      'Wide, level, and showing both sets of stumps — a practical guide to the camera position behind the bowler.',
+    href: '/cameras',
+    tag: 'Setup',
   },
   {
-    title: 'Authentication, without the headache',
+    title: 'How an LBW review actually works',
     date: 'July 2026',
     readTime: '5 min',
     excerpt:
-      'Hosted auth, OAuth, magic links, and session management — and why you shouldn’t build your own.',
-    href: '/docs/authentication',
-    tag: 'Authentication',
+      'Pitching, impact and the projected wicket line — and how the third umpire reads the evidence on screen.',
+    href: '/browse/categories/lbw',
+    tag: 'Reviews',
   },
   {
-    title: 'From idea to deployed app with Stack2Set',
+    title: 'Run outs and crease timing, frame by frame',
     date: 'July 2026',
     readTime: '4 min',
     excerpt:
-      'A step-by-step walkthrough of taking a project idea to a deployed stack using Stack2Set.',
-    href: '/docs/getting-started',
+      'Bails off, grounding, and the frame-by-frame comparison that settles a run out beyond doubt.',
+    href: '/browse/categories/runout',
     tag: 'Tutorial',
   },
   {
-    title: 'Managed cloud vs. self-hosted: what actually matters',
+    title: 'Ball tracking vs. reality on local turfs',
     date: 'June 2026',
     readTime: '7 min',
     excerpt:
-      'Speed, cost, control, and compliance — how to decide where your app should run.',
-    href: '/docs/cloud',
-    tag: 'Cloud',
+      'Balanced, clear, useful — how trajectory modelling fits grassroots grounds without pretending to be Hawk-Eye.',
+    href: '/browse/categories/ball-tracking',
+    tag: 'Ball tracking',
   },
   {
-    title: 'Shipping your first deployment: a checklist',
+    title: 'Running a full match with reviews',
     date: 'May 2026',
     readTime: '5 min',
     excerpt:
-      'Preview deployments, environment variables, custom domains, and monitoring — everything before you hit publish.',
-    href: '/docs/deployment',
-    tag: 'Deployment',
+      'Create the match, save the squads, capture every delivery, and settle the close ones — your weekend, reviewed.',
+    href: '/live',
+    tag: 'Matches',
   },
 ];
 
@@ -69,17 +68,17 @@ export default function BlogPage() {
         <header className="mx-auto max-w-3xl text-center">
           <p className="text-sm font-medium text-teal-400">Blog</p>
           <h1 className="mt-3 text-balance text-3xl font-semibold tracking-tight text-foreground sm:text-5xl">
-            Build better <span className="gradient-text">stacks</span>
+            Review the game, <span className="gradient-text">right</span>
           </h1>
           <p className="mx-auto mt-4 max-w-xl text-base leading-relaxed text-muted-foreground sm:text-lg">
-            Guides and insights on choosing databases, auth, cloud providers, and shipping to
-            production.
+            Guides and insights on camera setup, review types, ball tracking, and running a
+            Turf DRS match.
           </p>
         </header>
 
         <div className="mx-auto mt-16 max-w-3xl space-y-4">
           {posts.map((post) => (
-            <Link
+            <a
               key={post.title}
               href={post.href}
               className="group block glass glass-hover rounded-2xl p-6 transition-all hover:-translate-y-1"
@@ -104,7 +103,7 @@ export default function BlogPage() {
               <span className="mt-3 inline-flex items-center gap-1.5 text-xs font-medium text-teal-400">
                 Read guide <ArrowRight className="h-3 w-3 transition-transform group-hover:translate-x-0.5" />
               </span>
-            </Link>
+            </a>
           ))}
         </div>
       </div>

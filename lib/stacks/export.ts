@@ -76,7 +76,7 @@ export function toMarkdown(stack: UserStack): string {
   lines.push('---');
   lines.push('');
   lines.push(
-    `_Built with [Stack2Set](${siteConfig.url}) — AI-powered tech stack discovery._`,
+    `_Built with [Turf DRS](${siteConfig.url}) — AI-powered tech stack discovery._`,
   );
   return lines.join('\n').trim() + '\n';
 }
@@ -179,7 +179,7 @@ export function printStackHtml(stack: UserStack, health: StackHealth): void {
 <html>
 <head>
   <meta charset="utf-8" />
-  <title>${ESCAPE_HTML(stack.name)} — Stack2Set</title>
+  <title>${ESCAPE_HTML(stack.name)} — Turf DRS</title>
   <style>
     body { font-family: system-ui, -apple-system, sans-serif; color: #1a1a2e; margin: 40px; }
     h1 { font-size: 26px; margin-bottom: 4px; }
@@ -207,7 +207,7 @@ export function printStackHtml(stack: UserStack, health: StackHealth): void {
     · Est. monthly cost: <strong>${formatCurrency(cost)}</strong>
   </div>
   ${categoriesHtml}
-  <p class="footer">Built with Stack2Set — AI-powered tech stack discovery.</p>
+  <p class="footer">Built with Turf DRS — AI-powered tech stack discovery.</p>
   <script>window.onload = function(){ window.focus(); window.print(); };</script>
 </body>
 </html>`;

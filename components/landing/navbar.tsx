@@ -28,7 +28,7 @@ type NavLink = {
 const publicNavLinks: NavLink[] = [
   { label: 'Home', href: '/', pattern: '/' },
   { label: 'Explore', href: '/explore', pattern: '/explore' },
-  { label: 'Browse', href: '/browse/categories', pattern: '/browse/*' },
+  { label: 'Browse', href: '/browse', pattern: '/browse/*' },
   { label: 'Pricing', href: '/pricing', pattern: '/pricing' },
 ];
 

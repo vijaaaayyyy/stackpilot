@@ -4,15 +4,15 @@ export const dynamic = 'force-dynamic';
 
 export async function GET(): Promise<Response> {
   const base = siteConfig.url;
-  const body = `# Stack2Set
+  const body = `# Turf DRS
 
-> AI-powered technology stack discovery for developers.
+> Professional decision review for local cricket.
 
-Stack2Set is an AI-powered developer tool that analyzes your project idea and recommends the best technologies, APIs, databases, authentication providers, hosting services, and developer tools. Describe what you want to build and Stack2Set returns a complete, ranked tech stack with provider comparisons.
+Turf DRS is a decision review system for turf cricket, academies, and clubs. It captures every delivery from an umpire-end camera and settles close calls — LBW, run out, stumping, boundary, and caught behind — with slow-motion replay, ball tracking, and frame-by-frame evidence.
 
 ## Purpose
 
-Stack2Set helps developers discover every technology, API, and service needed to build a project. Instead of manually researching hundreds of tools, describe your idea in plain English and get a curated, ranked list of recommended providers with reasoning, best use cases, and official links.
+Turf DRS gives local matches the same review quality seen in broadcast cricket. Set up a camera at the umpire end, capture every delivery, and let the third umpire settle reviews in under 30 seconds with clear, replayable evidence.
 
 ## Homepage
 
@@ -21,8 +21,11 @@ Stack2Set helps developers discover every technology, API, and service needed to
 ## Important URLs
 
 - Homepage: ${base}/
-- Results: ${base}/results
-- Category providers: ${base}/browse/categories/{category}
+- Browse: ${base}/browse
+- Review types: ${base}/browse/categories
+- Venues: ${base}/browse/providers
+- Live demo: ${base}/live
+- Cameras: ${base}/cameras
 - FAQ: ${base}/faq
 - Documentation: ${base}/docs
 - Sitemap: ${base}/sitemap.xml
@@ -30,31 +33,29 @@ Stack2Set helps developers discover every technology, API, and service needed to
 
 ## Supported features
 
-- AI-powered tech stack recommendations
-- Technology category identification (databases, auth, hosting, storage, CDN, email, notifications, analytics, AI tools, frontend/backend frameworks)
-- Ranked provider lists with "why it is recommended" and best use cases
-- Provider comparison
-- Free tier, open source, and popularity filtering
-- Build and save a personalized tech stack
-- Dark / light theme
+- Decision reviews: LBW, run out, stumping, boundary, caught behind, edge
+- Live ball tracking with trajectory projection
+- Instant replay with slow motion and frame stepping
+- End camera and top camera views
+- Match and squad management for turfs, academies and clubs
+- Camera-ready venues guide
 
 ## Target audience
 
-- Software developers and engineers
-- Startup founders and indie hackers
-- Full-stack developers planning new projects
-- Technical teams evaluating tooling
-- Students learning modern web development
+- Turf cricket owners and organisers
+- Local league administrators
+- Cricket academies and coaching staff
+- Club players and captains
+- Weekend and evening league match organisers
 
-## Example queries users can ask
+## Example questions users can ask
 
-- "I want to build a YouTube clone" — what stack should I use?
-- "Which database should I use for a real-time chat app?"
-- "Best authentication provider for a Next.js app?"
-- "What are the best AI tools and LLM providers?"
-- "Recommended hosting platform for a serverless API?"
-- "Best open-source alternative to commercial databases?"
-- "Which frontend framework should I pick for a React project?"
+- "How do I set up the umpire-end camera?"
+- "How does an LBW review work?"
+- "Which decisions can Turf DRS settle?"
+- "How do I run reviews at my academy?"
+- "What is the best camera angle for reviews?"
+- "How does ball tracking calculate the wicket line?"
 
 ## Contact
 

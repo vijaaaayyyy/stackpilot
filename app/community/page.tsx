@@ -7,7 +7,7 @@ import { siteConfig } from '@/lib/site';
 export const metadata: Metadata = {
   title: 'Community',
   description:
-    'Join the Stack2Set community on GitHub and Twitter. Share your stacks, ask questions, and shape what gets built next.',
+    'Join the Turf DRS community on GitHub and Twitter. Share your grounds, ask about review setups, and shape what gets built next.',
   alternates: { canonical: '/community' },
 };
 
@@ -15,21 +15,21 @@ const channels = [
   {
     icon: Github,
     name: 'GitHub',
-    description: 'Browse the code, open issues, and contribute to Stack2Set.',
+    description: 'Browse the code, open issues, and contribute to Turf DRS.',
     href: siteConfig.github,
     color: 'text-foreground',
   },
   {
     icon: Twitter,
     name: 'Twitter / X',
-    description: 'Follow for product updates, tips, and stack inspiration.',
+    description: 'Follow for product updates, tips, and review inspiration.',
     href: 'https://x.com/vijayyyyy_7',
     color: 'text-sky-400',
   },
   {
     icon: MessagesSquare,
     name: 'Discussions',
-    description: 'Ask questions and share your stacks with other builders.',
+    description: 'Ask questions and share your camera setups with other grounds.',
     href: siteConfig.github,
     color: 'text-teal-400',
   },
@@ -45,10 +45,10 @@ export default function CommunityPage() {
         <header className="mx-auto max-w-3xl text-center">
           <p className="text-sm font-medium text-teal-400">Community</p>
           <h1 className="mt-3 text-balance text-3xl font-semibold tracking-tight text-foreground sm:text-5xl">
-            Built for developers, <span className="gradient-text">by developers</span>
+            Grounds, academies, <span className="gradient-text">great cricket</span>
           </h1>
           <p className="mx-auto mt-4 max-w-xl text-base leading-relaxed text-muted-foreground sm:text-lg">
-            Share your stacks, ask questions, and help shape what Stack2Set builds next.
+            Share your turf, ask about review setups, and help shape what Turf DRS builds next.
           </p>
         </header>
 

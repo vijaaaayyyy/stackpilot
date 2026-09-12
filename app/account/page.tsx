@@ -93,7 +93,7 @@ export default function AccountPage() {
               </div>
               <div className="min-w-0">
                 <h2 className="truncate text-lg font-semibold text-foreground">
-                  {displayName || 'Stack2Set user'}
+                  {displayName || 'Turf DRS user'}
                 </h2>
                 <p className="truncate text-sm text-muted-foreground">{user.email}</p>
                 {emailVerified ? (

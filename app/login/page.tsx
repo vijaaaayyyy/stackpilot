@@ -13,8 +13,8 @@ function LoginContent() {
   return (
     <AuthCard
       eyebrow="Welcome back"
-      title="Sign in to Stack2Set"
-      subtitle="Sync your stacks, save favorites, and pick up where you left off."
+      title="Sign in to Turf DRS"
+      subtitle="Access your matches, reviews and cameras."
       footer={
         <>
           Don&apos;t have an account?{' '}

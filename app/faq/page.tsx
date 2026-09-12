@@ -9,7 +9,7 @@ import { faqItems } from '@/lib/faq';
 export const metadata: Metadata = {
   title: 'FAQ',
   description:
-    'Answers to common questions about Stack2Set: how it works, whether it is free, how technologies are recommended, supported frameworks and databases, and more.',
+    'Answers to common questions about Turf DRS: how reviews work, what decisions it can settle, camera and equipment setup, matches and leagues, pricing and storage.',
   alternates: {
     canonical: '/faq',
   },
@@ -17,7 +17,7 @@ export const metadata: Metadata = {
     type: 'website',
     title: `FAQ — ${siteConfig.name}`,
     description:
-      'Answers to common questions about Stack2Set: how it works, whether it is free, and how technologies are recommended.',
+      'Answers to common questions about Turf DRS: how reviews work, what decisions it can settle, and camera and equipment setup.',
   },
 };
 
@@ -42,8 +42,8 @@ export default function FAQPage() {
               Frequently Asked <span className="gradient-text">Questions</span>
             </h1>
             <p className="mx-auto mt-4 max-w-xl text-base text-muted-foreground sm:text-lg">
-              Everything you need to know about Stack2Set and how it recommends the best technology
-              stack for your project.
+              Everything you need to know about Turf DRS — how reviews run, what it can
+              settle, and how to set it up at your ground.
             </p>
           </header>
 

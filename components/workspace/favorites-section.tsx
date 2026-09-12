@@ -44,7 +44,7 @@ export function FavoritesSection() {
         <div>
           <h3 className="text-sm font-semibold text-foreground">Favorites</h3>
           <p className="text-[11px] text-muted-foreground">
-            {user ? 'Saved to your Stack2Set account' : 'Saved on this device'}
+            {user ? 'Saved to your Turf DRS account' : 'Saved on this device'}
           </p>
         </div>
       </div>

@@ -34,7 +34,7 @@ export function SavedStacksPage() {
         file.name.toLowerCase().endsWith('.pdf')
           ? await importStackFromPdf(file)
           : parseStackImport(await file.text());
-      if (!stack) throw new Error('Could not read that file as a Stack2Set stack.');
+      if (!stack) throw new Error('Could not read that file as a Turf DRS stack.');
       importStack(stack);
       toast.success(`Imported "${stack.name}"`);
     } catch (error) {
@@ -75,7 +75,7 @@ export function SavedStacksPage() {
                 Saved Stacks
               </h1>
               <p className="mt-1 text-sm text-muted-foreground">
-                {user ? 'Stored in your Stack2Set account' : 'Saved on this device'} ·{' '}
+                {user ? 'Stored in your Turf DRS account' : 'Saved on this device'} ·{' '}
                 {currentWorkspace?.name ?? 'My Workspace'}
               </p>
             </div>

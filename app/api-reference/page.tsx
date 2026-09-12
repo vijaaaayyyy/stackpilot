@@ -8,11 +8,11 @@ import { siteConfig } from '@/lib/site';
 export const metadata: Metadata = {
   title: 'API Reference',
   description:
-    'Reference for the Stack2Set analysis endpoint: request format, response schema, and error handling.',
+    'Reference for the Turf DRS analysis endpoint: request format, response schema, and error handling.',
   alternates: { canonical: '/api-reference' },
 };
 
-const curlExample = `# Requires an authenticated session (sign in to Stack2Set first,
+const curlExample = `# Requires an authenticated session (sign in to Turf DRS first,
 # then run this from the same browser, or include your session cookie).
 curl -X POST ${siteConfig.url}/api/analyze \\
   -H "Content-Type: application/json" \\
@@ -57,7 +57,7 @@ export default function ApiReferencePage() {
           <header className="text-center">
             <p className="text-sm font-medium text-teal-400">API Reference</p>
             <h1 className="mt-3 text-balance text-3xl font-semibold tracking-tight text-foreground sm:text-5xl">
-              Stack2Set <span className="gradient-text">analysis API</span>
+              Turf DRS <span className="gradient-text">analysis API</span>
             </h1>
             <p className="mx-auto mt-4 max-w-xl text-base leading-relaxed text-muted-foreground sm:text-lg">
               Send a project description and get a ranked technology stack back. This is the same

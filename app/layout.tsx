@@ -18,7 +18,7 @@ const spaceGrotesk = Space_Grotesk({
   variable: '--font-display',
 });
 
-const themeInitScript = `(function(){try{var e=localStorage.getItem('stack2set-theme');var m=window.matchMedia('(prefers-color-scheme: dark)');var isDark;if(e==='light'){isDark=false}else if(e==='dark'){isDark=true}else{isDark=!e||e==='system'?m.matches:false}var d=document.documentElement;d.classList.add(isDark?'dark':'light');d.style.colorScheme=isDark?'dark':'light'}catch(e){}})()`;
+const themeInitScript = `(function(){try{var e=localStorage.getItem('turf-drs-theme');var m=window.matchMedia('(prefers-color-scheme: dark)');var isDark;if(e==='light'){isDark=false}else if(e==='dark'){isDark=true}else{isDark=!e||e==='system'?m.matches:false}var d=document.documentElement;d.classList.add(isDark?'dark':'light');d.style.colorScheme=isDark?'dark':'light'}catch(e){}})()`;
 
 export const metadata: Metadata = {
   metadataBase: new URL(siteConfig.url),

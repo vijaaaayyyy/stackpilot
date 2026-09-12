@@ -101,7 +101,7 @@ export function ProviderCompare({
         bestIndex: best(providers.map((p) => p.popularityScore)),
       },
       {
-        label: 'Stack2Set rating',
+        label: 'Turf DRS rating',
         values: providers.map((p) => p.stack2SetRating),
         bestIndex: best(providers.map((p) => p.stack2SetRating)),
       },

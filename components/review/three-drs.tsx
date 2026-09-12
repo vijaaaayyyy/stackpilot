@@ -18,7 +18,7 @@ import {
   type Outcome,
 } from '@/lib/drs/trajectory';
 
-export type DrsView = 'umpire' | 'top';
+export type DrsView = 'umpire' | 'top' | 'square';
 
 const BALL_RADIUS = 0.1;
 
@@ -158,6 +158,8 @@ export function ThreeDrsScene({
     const UMPIRE_LOOK = new THREE.Vector3(0, 0.35, 2.4);
     const TOP_POS = new THREE.Vector3(0, 9.4, 0.01);
     const TOP_LOOK = new THREE.Vector3(0, 0, 0);
+    const SQUARE_POS = new THREE.Vector3(2.9, 1.15, 1.5);
+    const SQUARE_LOOK = new THREE.Vector3(0, 0.4, 1.1);
 
     /* ------------------------------- Lights ------------------------------ */
     scene.add(new THREE.HemisphereLight(0xbfe8d8, 0x0b2417, 1.15));
@@ -363,15 +365,22 @@ export function ThreeDrsScene({
     scene.add(projectionTip);
 
     /* ============================== Camera rig =========================== */
-    const camPos = UMPIRE_POS.clone();
-    const camLook = UMPIRE_LOOK.clone();
+    const RIG: Record<DrsView, { pos: THREE.Vector3; look: THREE.Vector3 }> = {
+      umpire: { pos: UMPIRE_POS, look: UMPIRE_LOOK },
+      top: { pos: TOP_POS, look: TOP_LOOK },
+      square: { pos: SQUARE_POS, look: SQUARE_LOOK },
+    };
+    let fromView: DrsView = 'umpire';
     let activeView: DrsView | null = null;
     let transitionT = 1;
+    const camPos = UMPIRE_POS.clone();
+    const camLook = UMPIRE_LOOK.clone();
 
     const setViewTarget = (next: DrsView) => {
       if (activeView === next) return;
+      fromView = activeView === null ? 'umpire' : activeView;
       activeView = next;
-      transitionT = activeView === null ? 1 : 0;
+      transitionT = 0;
     };
 
     /* ============================== Frame loop =========================== */
@@ -397,23 +406,15 @@ export function ThreeDrsScene({
       /* Camera transition — snaps on the first frame, then eases between rigs */
       setViewTarget(s.view);
       if (transitionT >= 1) {
-        if (activeView === 'top') {
-          camPos.copy(TOP_POS);
-          camLook.copy(TOP_LOOK);
-        } else {
-          camPos.copy(UMPIRE_POS);
-          camLook.copy(UMPIRE_LOOK);
-        }
+        camPos.copy(RIG[activeView === null ? 'umpire' : activeView].pos);
+        camLook.copy(RIG[activeView === null ? 'umpire' : activeView].look);
       } else {
         transitionT = Math.min(transitionT + dt / 0.45, 1);
         const ease = 1 - Math.pow(1 - transitionT, 3);
-        if (activeView === 'top') {
-          camPos.lerpVectors(UMPIRE_POS, TOP_POS, ease);
-          camLook.lerpVectors(UMPIRE_LOOK, TOP_LOOK, ease);
-        } else {
-          camPos.lerpVectors(TOP_POS, UMPIRE_POS, ease);
-          camLook.lerpVectors(TOP_LOOK, UMPIRE_LOOK, ease);
-        }
+        const from = RIG[fromView];
+        const to = RIG[activeView === null ? 'umpire' : activeView];
+        camPos.lerpVectors(from.pos, to.pos, ease);
+        camLook.lerpVectors(from.look, to.look, ease);
       }
       camera.position.copy(camPos);
       camera.lookAt(camLook);

@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { AnimatePresence, motion, useReducedMotion } from 'framer-motion';
-import { ArrowRight, Radar, RotateCcw, ShieldAlert } from 'lucide-react';
+import { ArrowRight, Check, Radar, RotateCcw, Share2, ShieldAlert } from 'lucide-react';
 import type { Decision, ReviewTypeId } from '@/lib/drs/types';
 import { reasonFor } from '@/lib/drs/demo-service';
 
@@ -14,6 +14,14 @@ const LABELS: Record<ReviewTypeId, string> = {
   boundary: 'BOUNDARY',
 };
 
+const CARD_EMOJI: Record<ReviewTypeId, string> = {
+  lbw: '🏏',
+  caught: '👂',
+  runout: '🏃',
+  stumping: '🧤',
+  boundary: '🎯',
+};
+
 export const DECISION_OPTIONS: Decision[] = ['OUT', 'NOT OUT', 'INCONCLUSIVE'];
 
 export function DecisionReveal({
@@ -23,6 +31,8 @@ export function DecisionReveal({
   onReturn,
   onReset,
   returning = false,
+  matchLabel,
+  ball,
 }: {
   type: ReviewTypeId;
   decision: Decision;
@@ -30,16 +40,34 @@ export function DecisionReveal({
   onReturn: () => void;
   onReset: () => void;
   returning?: boolean;
+  matchLabel?: string;
+  ball?: string;
 }) {
   const reduce = useReducedMotion();
   const [stage, setStage] = useState<'complete' | 'verdict' | 'actions'>('complete');
   const [decisionKey, setDecisionKey] = useState(0);
+  const [copied, setCopied] = useState(false);
 
   const out = decision === 'OUT';
   const inconclusive = decision === 'INCONCLUSIVE';
   const color = inconclusive ? '#fbbf24' : out ? '#fb7185' : '#34d399';
   const glow = `0 0 42px ${color}77, 0 0 96px ${color}44`;
   const label = LABELS[type];
+  const cardText = `${CARD_EMOJI[type]} DRS Review — ${label}\n${matchLabel ?? 'Turf DRS'} · Ball ${ball ?? '—'}\nDecision: ${decision}\n${reasonFor(type, decision)}\n\n— via Turf DRS (https://www.stack2set.me)`;
+
+  const shareCard = async () => {
+    try {
+      if (typeof navigator !== 'undefined' && navigator.share) {
+        await navigator.share({ title: `${label} review — ${matchLabel ?? 'Turf DRS'}`, text: cardText });
+        return;
+      }
+      await navigator.clipboard.writeText(cardText);
+      setCopied(true);
+      window.setTimeout(() => setCopied(false), 1600);
+    } catch {
+      /* share dismissed */
+    }
+  };
 
   useEffect(() => {
     const timers: number[] = [
@@ -211,6 +239,15 @@ export function DecisionReveal({
             >
               <RotateCcw className="h-4 w-4" />
               Reset Review
+            </button>
+            <button
+              type="button"
+              onClick={shareCard}
+              disabled={returning}
+              className="inline-flex h-12 flex-1 items-center justify-center gap-2 rounded-xl border border-white/15 bg-white/[0.03] px-6 text-sm font-semibold text-white/80 transition-all hover:border-amber-400/40 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/60 disabled:opacity-60"
+            >
+              {copied ? <Check className="h-4 w-4 text-emerald-300" /> : <Share2 className="h-4 w-4" />}
+              {copied ? 'Copied' : 'Share decision'}
             </button>
             <button
               type="button"

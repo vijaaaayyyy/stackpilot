@@ -119,7 +119,7 @@ export function ReviewWorkstation({
 
   const reviewType = useMemo(() => normalizeType(type), [type]);
   const [phase, setPhase] = useState<'capture' | 'analysis' | 'reveal'>('capture');
-  const [view, setView] = useState<'umpire' | 'top'>('umpire');
+  const [view, setView] = useState<'umpire' | 'top' | 'square'>('umpire');
   const [evidence, setEvidence] = useState<ReviewEvidence | null>(null);
   const [decision, setDecision] = useState<Decision>(DEFAULT_DECISION[reviewType]);
   const [returning, setReturning] = useState(false);
@@ -521,6 +521,8 @@ export function ReviewWorkstation({
                 onReturn={handleReturn}
                 onReset={replay}
                 returning={returning}
+                matchLabel={matchLabel}
+                ball={ball}
               />
             </div>
           </div>
@@ -554,37 +556,43 @@ export function ReviewWorkstation({
               )}
 
               {isCaught && phase === 'analysis' && (
-                <div className="absolute bottom-4 left-1/2 z-20 -translate-x-1/2 rounded-full border border-emerald-400/30 bg-black/70 px-4 py-1.5 font-mono text-[10px] font-semibold uppercase tracking-[0.22em] text-emerald-300 backdrop-blur-sm">
+                <div className="absolute left-1/2 top-3 z-20 -translate-x-1/2 rounded-full border border-emerald-400/30 bg-black/70 px-4 py-1.5 font-mono text-[10px] font-semibold uppercase tracking-[0.22em] text-emerald-300 backdrop-blur-sm">
                   {evidence?.contactFrame ? `CONTACT · FRAME ${evidence.contactFrame}` : 'CONTACT · FRAME 241'}
                 </div>
               )}
 
-              {/* LBW umpire↔top toggle */}
-              {isLbw && phase === 'analysis' && (
-                <div className="absolute bottom-4 left-1/2 z-20 flex -translate-x-1/2 items-center gap-1 rounded-full border border-white/10 bg-black/70 p-1 backdrop-blur-sm">
-                  {(['umpire', 'top'] as const).map((v) => (
+              {/* DRS camera switcher — always available */}
+              <div className="absolute bottom-4 left-4 z-20 flex items-center gap-1 rounded-full border border-white/10 bg-black/70 p-1 backdrop-blur-sm">
+                  {(
+                    [
+                      ['umpire', 'Umpire'],
+                      ['top', 'Top'],
+                      ['square', 'Square'],
+                    ] as const
+                  ).map(([cam, label]) => (
                     <button
-                      key={v}
+                      key={cam}
                       type="button"
                       onClick={() => {
-                        setView(v);
-                        setZoom(v === 'umpire' ? 2.2 : 1);
+                        setView(cam);
+                        setZoom(cam === 'top' ? 1 : cam === 'umpire' ? 2.2 : 1.2);
                       }}
-                      aria-pressed={view === v}
+                      aria-pressed={view === cam}
                       className={cn(
                         'rounded-full px-3 py-1 font-mono text-[10px] font-semibold uppercase tracking-[0.18em] transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/60',
-                        view === v ? 'bg-amber-400/20 text-amber-300 ring-1 ring-amber-400/40' : 'text-white/50 hover:text-white',
+                        view === cam
+                          ? 'bg-amber-400/20 text-amber-300 ring-1 ring-amber-400/40'
+                          : 'text-white/50 hover:text-white',
                       )}
                     >
-                      {v === 'umpire' ? 'Umpire Cam' : 'Top Cam'}
+                      {label}
                     </button>
                   ))}
                 </div>
-              )}
             </div>
 
-            {/* Mobile footage drawer — desktop uses the sidebar version */}
-            <div className="lg:hidden">
+            {/* Footage drawer — all breakpoints */}
+            <div>
               <button
                 type="button"
                 onClick={() => setFootageOpen((value) => !value)}
@@ -621,14 +629,6 @@ export function ReviewWorkstation({
             {/* Evidence sidebar — desktop */}
             <aside aria-label="Review evidence" className="hidden shrink-0 flex-col border-l border-white/10 bg-[#0a0e16]/80 lg:flex">
               <div className="space-y-5 overflow-y-auto p-5">
-                <div>
-                  <p className="flex items-center gap-1.5 font-mono text-[10px] font-semibold uppercase tracking-[0.24em] text-white/45">
-                    <Video className="h-3 w-3" />
-                    Phone footage · Umpire end
-                  </p>
-                  {footagePanel}
-                </div>
-
                 <div>
                   <p className="flex items-center gap-1.5 font-mono text-[10px] font-semibold uppercase tracking-[0.24em] text-white/45">
                     <Scale className="h-3 w-3" />

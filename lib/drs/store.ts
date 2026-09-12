@@ -18,6 +18,7 @@ type ReviewRow = {
   status: ReviewStatus;
   reason: string;
   created_at: string;
+  clip_path: string | null;
 };
 
 function fromRow(row: ReviewRow): Review {
@@ -34,6 +35,7 @@ function fromRow(row: ReviewRow): Review {
     createdAt: new Date(row.created_at).getTime(),
     userEmail: row.user_email ?? undefined,
     userName: row.user_name ?? undefined,
+    clipPath: row.clip_path ?? undefined,
   };
 }
 
@@ -49,6 +51,7 @@ function toRow(review: Review): Omit<ReviewRow, 'id' | 'user_id' | 'created_at'>
     decision: review.decision,
     status: review.status,
     reason: review.reason,
+    clip_path: review.clipUrl ?? review.clipPath ?? null,
   };
 }
 

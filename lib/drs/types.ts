@@ -125,6 +125,10 @@ export type Review = {
   /** Signed-in user details captured at review time (demo runs signed-out = absent). */
   userEmail?: string;
   userName?: string;
+  /** Supabase Storage path of the recorded/uploaded delivery clip. */
+  clipPath?: string;
+  /** Public URL for the clip (works once the storage bucket is public). */
+  clipUrl?: string;
 };
 
 export type DemoFlowStep = 'live' | 'review-triggered' | 'decision';
